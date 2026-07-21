@@ -443,7 +443,6 @@ function NewGembaForm({
                 name="collaborator"
                 value={gembaData.collaborator}
                 onChange={onChange}
-                placeholder="Ej. Juan Pérez"
               />
             </label>
 
@@ -458,7 +457,6 @@ function NewGembaForm({
                 name="task"
                 value={gembaData.task}
                 onChange={onChange}
-                placeholder="Ej. Retiro de material atascado"
               />
             </label>
 
@@ -468,13 +466,15 @@ function NewGembaForm({
                 Auditor
               </span>
 
-              <input
-                type="text"
+              <select
                 name="auditor"
                 value={gembaData.auditor}
                 onChange={onChange}
-                placeholder="Nombre del auditor"
-              />
+              >
+                <option value="Pablo Hernández">Pablo Hernández</option>
+                <option value="José Suruy">José Suruy</option>
+                <option value="Ricardo Estrada">Ricardo Estrada</option>
+              </select>
             </label>
           </div>
 
