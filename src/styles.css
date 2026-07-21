@@ -27,6 +27,10 @@ button {
   cursor: pointer;
 }
 
+textarea {
+  resize: vertical;
+}
+
 .app-shell {
   min-height: 100vh;
   display: flex;
@@ -191,7 +195,8 @@ button {
 ========================= */
 
 .primary-button,
-.secondary-button {
+.secondary-button,
+.evidence-button {
   border: 0;
   border-radius: 10px;
   padding: 12px 18px;
@@ -221,6 +226,16 @@ button {
 
 .secondary-button:hover {
   background: #e4e9f1;
+}
+
+.evidence-button {
+  background: #f8fafc;
+  color: #475467;
+  border: 1px solid #dfe4ea;
+}
+
+.evidence-button:hover {
+  background: #f1f5f9;
 }
 
 /* =========================
@@ -465,9 +480,9 @@ button {
 }
 
 .form-field input,
-.form-field select {
+.form-field select,
+.form-field textarea {
   width: 100%;
-  height: 46px;
   border: 1px solid #dfe4ea;
   border-radius: 10px;
   padding: 0 13px;
@@ -477,12 +492,20 @@ button {
   transition: 0.2s ease;
 }
 
-.form-field input::placeholder {
-  color: #98a2b3;
+.form-field input,
+.form-field select {
+  height: 46px;
+}
+
+.form-field textarea {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  min-height: 100px;
 }
 
 .form-field input:focus,
-.form-field select:focus {
+.form-field select:focus,
+.form-field textarea:focus {
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
 }
@@ -623,6 +646,11 @@ button {
   box-shadow: 0 9px 20px rgba(15, 23, 42, 0.06);
 }
 
+.gemba-module-card.completed {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
 .gemba-module-content {
   min-width: 0;
   flex: 1;
@@ -648,6 +676,14 @@ button {
   color: #667085;
   font-size: 10px;
   font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-pill.completed {
+  background: #dcfce7;
+  color: #15803d;
 }
 
 .gemba-module-content p {
@@ -693,6 +729,465 @@ button {
   margin-top: 3px;
   color: #98a2b3;
   font-size: 11px;
+}
+
+/* =========================
+   SEGURIDAD - PROGRESO
+========================= */
+
+.safety-progress {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.safety-step {
+  border: 1px solid #e6eaf0;
+  border-radius: 14px;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  color: #344054;
+  text-align: left;
+  transition: 0.2s ease;
+}
+
+.safety-step:hover {
+  border-color: #cfd6df;
+}
+
+.safety-step.active {
+  border-color: #fda4af;
+  background: #fff1f2;
+}
+
+.safety-step-number {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #f2f4f7;
+  color: #475467;
+  font-weight: 800;
+}
+
+.safety-step.active .safety-step-number {
+  background: #e11d48;
+  color: white;
+}
+
+.safety-step strong,
+.safety-step small {
+  display: block;
+}
+
+.safety-step strong {
+  font-size: 13px;
+}
+
+.safety-step small {
+  margin-top: 3px;
+  color: #98a2b3;
+  font-size: 11px;
+}
+
+/* =========================
+   SEGURIDAD - AUDIT CARD
+========================= */
+
+.audit-section-card {
+  background: white;
+  border: 1px solid #e6eaf0;
+  border-radius: 16px;
+  padding: 26px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.035);
+}
+
+.audit-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.audit-section-header h3 {
+  margin: 5px 0 7px;
+  font-size: 22px;
+}
+
+.audit-section-header p {
+  margin: 0;
+  max-width: 720px;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.audit-section-icon {
+  width: 50px;
+  height: 50px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+}
+
+.audit-section-icon.safety {
+  background: #fff1f2;
+  color: #e11d48;
+}
+
+.audit-section-icon.behavior {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.audit-section-icon.procedure {
+  background: #f5f3ff;
+  color: #7c3aed;
+}
+
+/* =========================
+   QUESTIONS
+========================= */
+
+.audit-question {
+  padding: 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.audit-question > div:first-child {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.audit-question.stacked {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.audit-question.stacked.inner {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.question-number {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.audit-question strong,
+.conditional-title strong {
+  color: #172033;
+  font-size: 15px;
+}
+
+.audit-question p,
+.conditional-title p {
+  margin: 5px 0 0;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.yes-no-group {
+  display: flex;
+  gap: 8px;
+}
+
+.choice-button {
+  min-width: 76px;
+  border: 1px solid #dfe4ea;
+  border-radius: 10px;
+  padding: 10px 16px;
+  background: white;
+  color: #475467;
+  font-weight: 800;
+}
+
+.choice-button:hover {
+  background: #f8fafc;
+}
+
+.choice-button.selected.success {
+  background: #ecfdf3;
+  border-color: #86efac;
+  color: #15803d;
+}
+
+.choice-button.selected.danger {
+  background: #fff1f2;
+  border-color: #fda4af;
+  color: #be123c;
+}
+
+/* =========================
+   CONDITIONAL AREAS
+========================= */
+
+.conditional-area {
+  padding: 22px 0 0;
+}
+
+.conditional-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.finding-entry-card {
+  padding: 18px;
+  border: 1px solid #e6eaf0;
+  border-radius: 14px;
+  background: #fbfcfe;
+}
+
+.finding-options-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(280px, 1fr);
+  gap: 16px;
+}
+
+.finding-options-grid.single {
+  grid-template-columns: minmax(220px, 0.5fr);
+}
+
+.maintenance-check {
+  display: flex;
+  align-items: center;
+}
+
+.maintenance-check > input {
+  width: 18px;
+  height: 18px;
+  margin-right: 10px;
+  accent-color: #ea580c;
+}
+
+.maintenance-check > div {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.maintenance-check span,
+.maintenance-check strong,
+.maintenance-check small {
+  display: block;
+}
+
+.maintenance-check strong {
+  font-size: 12px;
+}
+
+.maintenance-check small {
+  margin-top: 3px;
+  color: #c2410c;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.finding-entry-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* =========================
+   FINDINGS LIST
+========================= */
+
+.findings-list {
+  margin-top: 20px;
+}
+
+.findings-list-title {
+  margin-bottom: 10px;
+  color: #344054;
+  font-size: 13px;
+}
+
+.finding-item {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  border: 1px solid #e6eaf0;
+  border-radius: 12px;
+  background: white;
+}
+
+.finding-index {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f2f4f7;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.finding-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.finding-item-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.finding-item-top p {
+  margin: 0;
+  color: #344054;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.icon-delete-button {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #e11d48;
+}
+
+.icon-delete-button:hover {
+  background: #ffe4e6;
+}
+
+.finding-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.criticality-tag,
+.maintenance-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.criticality-tag.baja {
+  background: #ecfdf3;
+  color: #15803d;
+}
+
+.criticality-tag.media {
+  background: #fffbeb;
+  color: #a16207;
+}
+
+.criticality-tag.alta {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.criticality-tag.crítica {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.maintenance-tag {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+/* =========================
+   PROCEDURES
+========================= */
+
+.procedure-action-box {
+  margin-top: 20px;
+  padding: 18px;
+  border: 1px solid #fde68a;
+  border-radius: 14px;
+  background: #fffbeb;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #92400e;
+}
+
+.procedure-action-box > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.procedure-action-box > div {
+  flex: 1;
+}
+
+.procedure-action-box strong {
+  font-size: 14px;
+}
+
+.procedure-action-box p {
+  margin: 5px 0 15px;
+  color: #a16207;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.procedure-observations {
+  margin-top: 20px;
+}
+
+/* =========================
+   AUDIT NAVIGATION
+========================= */
+
+.audit-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid #edf0f4;
 }
 
 /* =========================
@@ -749,6 +1244,10 @@ button {
 
   .gemba-context-card {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .safety-progress {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -869,6 +1368,41 @@ button {
   .gemba-progress {
     text-align: center;
   }
+
+  .audit-question {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .yes-no-group {
+    width: 100%;
+  }
+
+  .choice-button {
+    flex: 1;
+  }
+
+  .finding-options-grid,
+  .finding-options-grid.single {
+    grid-template-columns: 1fr;
+  }
+
+  .finding-entry-actions {
+    flex-direction: column;
+  }
+
+  .finding-entry-actions button {
+    width: 100%;
+  }
+
+  .audit-navigation {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .audit-navigation button {
+    width: 100%;
+  }
 }
 
 @media (max-width: 460px) {
@@ -883,7 +1417,12 @@ button {
 
   .gemba-form-card,
   .gemba-help-card,
-  .section-block {
+  .section-block,
+  .audit-section-card {
     padding: 18px;
+  }
+
+  .audit-section-header {
+    flex-direction: column;
   }
 }
