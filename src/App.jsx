@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { catalogo } from "./data/CatalogoMaquinas.js";
+import { colaboradores } from "./data/CatalogoColaboradores.js";
 
 function App() {
   const [currentPage, setCurrentPage] = useState("dashboard");
@@ -91,6 +92,12 @@ function App() {
       .map((item) => item.proceso);
   }, [gembaData.maquina]);
 
+  const colaboradoresOrdenados = useMemo(() => {
+    return [...colaboradores].sort((a, b) =>
+      a.localeCompare(b, "es")
+    );
+  }, []);
+
   const currentDate = new Intl.DateTimeFormat("es-GT", {
     dateStyle: "long",
     timeStyle: "short",
@@ -125,9 +132,9 @@ function App() {
     if (
       !gembaData.maquina ||
       !gembaData.proceso ||
-      !gembaData.collaborator.trim() ||
+      !gembaData.collaborator ||
       !gembaData.task.trim() ||
-      !gembaData.auditor.trim()
+      !gembaData.auditor
     ) {
       alert("Completá todos los datos antes de iniciar el Gemba.");
       return;
@@ -208,7 +215,10 @@ function App() {
 
       <main className="main-content">
         {currentPage === "dashboard" && (
-          <Dashboard modules={modules} onNewGemba={handleNewGemba} />
+          <Dashboard
+            modules={modules}
+            onNewGemba={handleNewGemba}
+          />
         )}
 
         {currentPage === "nuevo-gemba" && !gembaStarted && (
@@ -216,6 +226,7 @@ function App() {
             gembaData={gembaData}
             maquinas={maquinas}
             procesosDisponibles={procesosDisponibles}
+            colaboradores={colaboradoresOrdenados}
             currentDate={currentDate}
             onChange={handleInputChange}
             onSubmit={handleStartGemba}
@@ -346,6 +357,7 @@ function NewGembaForm({
   gembaData,
   maquinas,
   procesosDisponibles,
+  colaboradores,
   currentDate,
   onChange,
   onSubmit,
@@ -370,6 +382,7 @@ function NewGembaForm({
           <div className="form-card-header">
             <div>
               <span className="step-label">Paso 1 de 2</span>
+
               <h3>Datos generales</h3>
 
               <p>
@@ -438,12 +451,19 @@ function NewGembaForm({
                 Colaborador observado
               </span>
 
-              <input
-                type="text"
+              <select
                 name="collaborator"
                 value={gembaData.collaborator}
                 onChange={onChange}
-              />
+              >
+                <option value="">Seleccionar colaborador</option>
+
+                {colaboradores.map((colaborador) => (
+                  <option value={colaborador} key={colaborador}>
+                    {colaborador}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="form-field">
@@ -471,9 +491,17 @@ function NewGembaForm({
                 value={gembaData.auditor}
                 onChange={onChange}
               >
-                <option value="Pablo Hernández">Pablo Hernández</option>
-                <option value="José Suruy">José Suruy</option>
-                <option value="Ricardo Estrada">Ricardo Estrada</option>
+                <option value="Pablo Hernández">
+                  Pablo Hernández
+                </option>
+
+                <option value="José Suruy">
+                  José Suruy
+                </option>
+
+                <option value="Ricardo Estrada">
+                  Ricardo Estrada
+                </option>
               </select>
             </label>
           </div>
@@ -619,7 +647,9 @@ function GembaModules({
                   <div className="module-title-row">
                     <h4>{module.name}</h4>
 
-                    <span className="status-pill">{module.status}</span>
+                    <span className="status-pill">
+                      {module.status}
+                    </span>
                   </div>
 
                   <p>{module.description}</p>
@@ -658,7 +688,9 @@ function PlaceholderPage({ title, text, Icon }) {
       </div>
 
       <span className="eyebrow">GDR Gemba</span>
+
       <h2>{title}</h2>
+
       <p>{text}</p>
     </section>
   );
