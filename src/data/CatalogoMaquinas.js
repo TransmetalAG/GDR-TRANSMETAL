@@ -1,0 +1,79 @@
+export const equipmentCatalog = [
+  { maquina: "Cab. Soldadura 1", proceso: "Capirucho" },
+  { maquina: "Cab. Soldadura 2", proceso: "Rueda" },
+  { maquina: "Caiman", proceso: "Caiman" },
+
+  { maquina: "Embutidora 200", proceso: "Apachado" },
+  { maquina: "Embutidora 200", proceso: "Corona" },
+  { maquina: "Embutidora 200", proceso: "Corte" },
+
+  { maquina: "Embutidora 315", proceso: "Apachado" },
+  { maquina: "Embutidora 315", proceso: "Corona" },
+  { maquina: "Embutidora 315", proceso: "Embutido" },
+
+  {
+    maquina: "Perforadora de tolva",
+    proceso: "Perforado de tolva",
+  },
+
+  {
+    maquina: "Pintura Electroestatica",
+    proceso: "Pintura de piezas",
+  },
+
+  { maquina: "Serigrafía", proceso: "Serigrafía" },
+
+  { maquina: "Sierra de Cinta", proceso: "Tubito" },
+
+  {
+    maquina: "Troqueladora 1",
+    proceso: "Perforado de chumacera",
+  },
+
+  {
+    maquina: "Troqueladora 2",
+    proceso: "Rigidez de patilla",
+  },
+
+  {
+    maquina: "Troqueladora 3",
+    proceso: "Perforado de hembra",
+  },
+
+  {
+    maquina: "Troqueladora 5",
+    proceso: "Embutido de chumacera",
+  },
+
+  {
+    maquina: "Troqueladora 6",
+    proceso: "Formado en pata en V",
+  },
+
+  {
+    maquina: "Troqueladora 7",
+    proceso: "Canal 4.5",
+  },
+
+  {
+    maquina: "Troqueladora 7",
+    proceso: "Canal liviana",
+  },
+
+  {
+    maquina: "Troqueladora 7",
+    proceso: "Formado en pata en V 4.5",
+  },
+
+  {
+    maquina: "Troqueladora 7",
+    proceso: "Formado en pata en V liviana",
+  },
+
+  {
+    maquina: "Troqueladora de plato",
+    proceso: "Plato",
+  },
+
+  { maquina: "Tubo", proceso: "Tubo" },
+];
