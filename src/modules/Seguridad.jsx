@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  ShieldCheck,
   HardHat,
   UserRoundCheck,
   FileCheck2,
@@ -30,7 +29,10 @@ function Seguridad({ gembaData, onBack, onComplete }) {
   const [procedimientos, setProcedimientos] = useState({
     existeProcedimiento: "",
     estaActualizado: "",
-    responsableActualizacion: "",
+    reflejaRealidad: "",
+    conoceYAplica: "",
+    responsable: "",
+    tipoAccion: "",
     observaciones: "",
   });
 
@@ -150,37 +152,54 @@ function Seguridad({ gembaData, onBack, onComplete }) {
     }
 
     if (!procedimientos.existeProcedimiento) {
-      alert("Completá la revisión de Procedimientos.");
-      avanzarA("procedimientos");
-      return;
-    }
-
-    if (
-      procedimientos.existeProcedimiento === "si" &&
-      !procedimientos.estaActualizado
-    ) {
-      alert("Indicá si el procedimiento está actualizado.");
+      alert("Indicá si existe un procedimiento para realizar la tarea.");
       avanzarA("procedimientos");
       return;
     }
 
     if (
       procedimientos.existeProcedimiento === "no" &&
-      !procedimientos.responsableActualizacion.trim()
+      !procedimientos.responsable.trim()
     ) {
       alert("Indicá un responsable para elaborar el procedimiento.");
       avanzarA("procedimientos");
       return;
     }
 
-    if (
-      procedimientos.existeProcedimiento === "si" &&
-      procedimientos.estaActualizado === "no" &&
-      !procedimientos.responsableActualizacion.trim()
-    ) {
-      alert("Indicá un responsable para actualizar el procedimiento.");
-      avanzarA("procedimientos");
-      return;
+    if (procedimientos.existeProcedimiento === "si") {
+      if (!procedimientos.estaActualizado) {
+        alert("Indicá si el procedimiento está actualizado.");
+        avanzarA("procedimientos");
+        return;
+      }
+
+      if (!procedimientos.reflejaRealidad) {
+        alert(
+          "Indicá si el procedimiento refleja la forma real en que se ejecuta la tarea."
+        );
+        avanzarA("procedimientos");
+        return;
+      }
+
+      if (!procedimientos.conoceYAplica) {
+        alert(
+          "Indicá si el colaborador conoce y aplica el procedimiento."
+        );
+        avanzarA("procedimientos");
+        return;
+      }
+
+      const requiereAccion =
+        procedimientos.estaActualizado === "no" ||
+        procedimientos.reflejaRealidad === "no" ||
+        procedimientos.conoceYAplica === "parcialmente" ||
+        procedimientos.conoceYAplica === "no";
+
+      if (requiereAccion && !procedimientos.responsable.trim()) {
+        alert("Indicá un responsable para dar seguimiento a la acción.");
+        avanzarA("procedimientos");
+        return;
+      }
     }
 
     const resultadoSeguridad = {
@@ -191,6 +210,13 @@ function Seguridad({ gembaData, onBack, onComplete }) {
 
     onComplete(resultadoSeguridad);
   }
+
+  const requiereAccionProcedimiento =
+    procedimientos.existeProcedimiento === "no" ||
+    procedimientos.estaActualizado === "no" ||
+    procedimientos.reflejaRealidad === "no" ||
+    procedimientos.conoceYAplica === "parcialmente" ||
+    procedimientos.conoceYAplica === "no";
 
   return (
     <>
@@ -283,7 +309,7 @@ function Seguridad({ gembaData, onBack, onComplete }) {
 
           <div>
             <strong>Procedimientos</strong>
-            <small>Existencia y actualización</small>
+            <small>Existencia, vigencia y aplicación</small>
           </div>
         </button>
       </section>
@@ -427,6 +453,7 @@ function Seguridad({ gembaData, onBack, onComplete }) {
 
                     <div>
                       <Wrench size={19} />
+
                       <span>
                         <strong>Requiere Mantenimiento</strong>
                         <small>
@@ -705,7 +732,8 @@ function Seguridad({ gembaData, onBack, onComplete }) {
                 <div className="findings-list">
                   <div className="findings-list-title">
                     <strong>
-                      Desvíos registrados ({comportamiento.hallazgos.length})
+                      Desvíos registrados (
+                      {comportamiento.hallazgos.length})
                     </strong>
                   </div>
 
@@ -798,13 +826,13 @@ function Seguridad({ gembaData, onBack, onComplete }) {
               <h3>Procedimientos</h3>
 
               <p>
-                Verificá que exista un procedimiento aplicable y que refleje
-                la forma correcta y segura de ejecutar la tarea.
+                Verificá la existencia, vigencia, correspondencia con el
+                trabajo real y aplicación del procedimiento.
               </p>
             </div>
           </div>
 
-          <div className="audit-question stacked">
+          <div className="audit-question">
             <div>
               <span className="question-number">1</span>
 
@@ -812,6 +840,11 @@ function Seguridad({ gembaData, onBack, onComplete }) {
                 <strong>
                   ¿Existe un procedimiento para realizar la tarea?
                 </strong>
+
+                <p>
+                  Verificá que exista un documento o estándar definido para la
+                  actividad observada.
+                </p>
               </div>
             </div>
 
@@ -827,7 +860,8 @@ function Seguridad({ gembaData, onBack, onComplete }) {
                   setProcedimientos((previous) => ({
                     ...previous,
                     existeProcedimiento: "si",
-                    responsableActualizacion: "",
+                    responsable: "",
+                    tipoAccion: "",
                   }))
                 }
               >
@@ -846,6 +880,9 @@ function Seguridad({ gembaData, onBack, onComplete }) {
                     ...previous,
                     existeProcedimiento: "no",
                     estaActualizado: "",
+                    reflejaRealidad: "",
+                    conoceYAplica: "",
+                    tipoAccion: "Elaborar procedimiento",
                   }))
                 }
               >
@@ -855,8 +892,8 @@ function Seguridad({ gembaData, onBack, onComplete }) {
           </div>
 
           {procedimientos.existeProcedimiento === "si" && (
-            <div className="conditional-area">
-              <div className="audit-question stacked inner">
+            <>
+              <div className="audit-question">
                 <div>
                   <span className="question-number">2</span>
 
@@ -864,6 +901,11 @@ function Seguridad({ gembaData, onBack, onComplete }) {
                     <strong>
                       ¿El procedimiento está actualizado?
                     </strong>
+
+                    <p>
+                      Verificá que la versión vigente corresponda al proceso,
+                      equipo y condiciones actuales.
+                    </p>
                   </div>
                 </div>
 
@@ -879,7 +921,6 @@ function Seguridad({ gembaData, onBack, onComplete }) {
                       setProcedimientos((previous) => ({
                         ...previous,
                         estaActualizado: "si",
-                        responsableActualizacion: "",
                       }))
                     }
                   >
@@ -897,6 +938,7 @@ function Seguridad({ gembaData, onBack, onComplete }) {
                       setProcedimientos((previous) => ({
                         ...previous,
                         estaActualizado: "no",
+                        tipoAccion: "Actualizar procedimiento",
                       }))
                     }
                   >
@@ -904,77 +946,213 @@ function Seguridad({ gembaData, onBack, onComplete }) {
                   </button>
                 </div>
               </div>
-            </div>
+
+              <div className="audit-question">
+                <div>
+                  <span className="question-number">3</span>
+
+                  <div>
+                    <strong>
+                      ¿El procedimiento refleja la forma real en que se ejecuta
+                      la tarea?
+                    </strong>
+
+                    <p>
+                      Compará lo documentado con la ejecución observada
+                      directamente en el Gemba.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="yes-no-group">
+                  <button
+                    type="button"
+                    className={
+                      procedimientos.reflejaRealidad === "si"
+                        ? "choice-button selected success"
+                        : "choice-button"
+                    }
+                    onClick={() =>
+                      setProcedimientos((previous) => ({
+                        ...previous,
+                        reflejaRealidad: "si",
+                      }))
+                    }
+                  >
+                    Sí
+                  </button>
+
+                  <button
+                    type="button"
+                    className={
+                      procedimientos.reflejaRealidad === "no"
+                        ? "choice-button selected danger"
+                        : "choice-button"
+                    }
+                    onClick={() =>
+                      setProcedimientos((previous) => ({
+                        ...previous,
+                        reflejaRealidad: "no",
+                        tipoAccion:
+                          "Adecuar procedimiento al proceso real",
+                      }))
+                    }
+                  >
+                    No
+                  </button>
+                </div>
+              </div>
+
+              <div className="audit-question">
+                <div>
+                  <span className="question-number">4</span>
+
+                  <div>
+                    <strong>
+                      ¿El colaborador conoce y aplica el procedimiento?
+                    </strong>
+
+                    <p>
+                      Validá el conocimiento del estándar y su aplicación
+                      durante la ejecución de la tarea.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="yes-no-group">
+                  <button
+                    type="button"
+                    className={
+                      procedimientos.conoceYAplica === "si"
+                        ? "choice-button selected success"
+                        : "choice-button"
+                    }
+                    onClick={() =>
+                      setProcedimientos((previous) => ({
+                        ...previous,
+                        conoceYAplica: "si",
+                      }))
+                    }
+                  >
+                    Sí
+                  </button>
+
+                  <button
+                    type="button"
+                    className={
+                      procedimientos.conoceYAplica === "parcialmente"
+                        ? "choice-button selected danger"
+                        : "choice-button"
+                    }
+                    onClick={() =>
+                      setProcedimientos((previous) => ({
+                        ...previous,
+                        conoceYAplica: "parcialmente",
+                        tipoAccion:
+                          "Reinducción / capacitación",
+                      }))
+                    }
+                  >
+                    Parcialmente
+                  </button>
+
+                  <button
+                    type="button"
+                    className={
+                      procedimientos.conoceYAplica === "no"
+                        ? "choice-button selected danger"
+                        : "choice-button"
+                    }
+                    onClick={() =>
+                      setProcedimientos((previous) => ({
+                        ...previous,
+                        conoceYAplica: "no",
+                        tipoAccion: "Capacitación",
+                      }))
+                    }
+                  >
+                    No
+                  </button>
+                </div>
+              </div>
+            </>
           )}
 
-          {procedimientos.existeProcedimiento === "no" && (
+          {requiereAccionProcedimiento && (
             <div className="procedure-action-box">
               <AlertTriangle size={22} />
 
               <div>
-                <strong>
-                  Se requiere elaborar un procedimiento.
-                </strong>
+                <strong>Se requiere generar una acción.</strong>
 
                 <p>
-                  Esta necesidad generará una acción dentro del Plan de Acción.
+                  El desvío detectado será incorporado al Plan de Acción para
+                  asegurar su seguimiento y cierre.
                 </p>
 
-                <label className="form-field">
-                  <span>Responsable de elaboración</span>
-
-                  <input
-                    type="text"
-                    value={
-                      procedimientos.responsableActualizacion
-                    }
-                    onChange={(event) =>
-                      setProcedimientos((previous) => ({
-                        ...previous,
-                        responsableActualizacion:
-                          event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-              </div>
-            </div>
-          )}
-
-          {procedimientos.existeProcedimiento === "si" &&
-            procedimientos.estaActualizado === "no" && (
-              <div className="procedure-action-box">
-                <AlertTriangle size={22} />
-
-                <div>
-                  <strong>
-                    El procedimiento requiere actualización.
-                  </strong>
-
-                  <p>
-                    Definí quién será responsable de gestionar la actualización.
-                  </p>
-
+                <div className="form-grid">
                   <label className="form-field">
-                    <span>Responsable de actualización</span>
+                    <span>Tipo de acción</span>
 
-                    <input
-                      type="text"
-                      value={
-                        procedimientos.responsableActualizacion
-                      }
+                    <select
+                      value={procedimientos.tipoAccion}
                       onChange={(event) =>
                         setProcedimientos((previous) => ({
                           ...previous,
-                          responsableActualizacion:
-                            event.target.value,
+                          tipoAccion: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Seleccionar acción</option>
+
+                      <option value="Elaborar procedimiento">
+                        Elaborar procedimiento
+                      </option>
+
+                      <option value="Actualizar procedimiento">
+                        Actualizar procedimiento
+                      </option>
+
+                      <option value="Adecuar procedimiento al proceso real">
+                        Adecuar procedimiento al proceso real
+                      </option>
+
+                      <option value="Capacitación">
+                        Capacitación
+                      </option>
+
+                      <option value="Reinducción / capacitación">
+                        Reinducción / capacitación
+                      </option>
+
+                      <option value="Revisión con supervisor">
+                        Revisión con supervisor
+                      </option>
+
+                      <option value="Otra">
+                        Otra
+                      </option>
+                    </select>
+                  </label>
+
+                  <label className="form-field">
+                    <span>Responsable</span>
+
+                    <input
+                      type="text"
+                      value={procedimientos.responsable}
+                      onChange={(event) =>
+                        setProcedimientos((previous) => ({
+                          ...previous,
+                          responsable: event.target.value,
                         }))
                       }
                     />
                   </label>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
           {procedimientos.existeProcedimiento && (
             <div className="procedure-observations">
