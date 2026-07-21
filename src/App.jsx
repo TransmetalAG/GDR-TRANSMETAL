@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   LayoutDashboard,
   Footprints,
@@ -11,49 +11,27 @@ import {
   Sparkles,
   ArrowLeft,
   ArrowRight,
-  MapPin,
   User,
   Factory,
   Hammer,
   CalendarDays,
   CheckCircle2,
+  Workflow,
 } from "lucide-react";
+
+import { catalogo } from "./data/CatalogoMaquinas.js";
 
 function App() {
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [gembaStarted, setGembaStarted] = useState(false);
 
   const [gembaData, setGembaData] = useState({
-    area: "",
-    machine: "",
+    maquina: "",
+    proceso: "",
     collaborator: "",
     task: "",
     auditor: "Pablo Hernández",
   });
-
-  const areas = [
-    "Prensas",
-    "Pintura Electrostática",
-    "Tubo",
-    "Soldadura",
-    "Lámina Plástica",
-  ];
-
-  const machinesByArea = {
-    Prensas: ["Prensa 304", "Prensa 305", "Prensa 309"],
-    "Pintura Electrostática": [
-      "Cabina de pintura",
-      "Horno",
-      "Transportador",
-    ],
-    Tubo: ["Dobladora", "Formadora", "Perforadora"],
-    Soldadura: ["Estación de soldadura 1", "Estación de soldadura 2"],
-    "Lámina Plástica": [
-      "Línea de laminado",
-      "Horno",
-      "Cortadora automática",
-    ],
-  };
 
   const modules = [
     {
@@ -101,6 +79,18 @@ function App() {
     { id: "mis-tareas", label: "Mis tareas", icon: ListTodo },
   ];
 
+  const maquinas = useMemo(() => {
+    return [...new Set(catalogo.map((item) => item.maquina))].sort();
+  }, []);
+
+  const procesosDisponibles = useMemo(() => {
+    if (!gembaData.maquina) return [];
+
+    return catalogo
+      .filter((item) => item.maquina === gembaData.maquina)
+      .map((item) => item.proceso);
+  }, [gembaData.maquina]);
+
   const currentDate = new Intl.DateTimeFormat("es-GT", {
     dateStyle: "long",
     timeStyle: "short",
@@ -109,10 +99,23 @@ function App() {
   function handleInputChange(event) {
     const { name, value } = event.target;
 
+    if (name === "maquina") {
+      const procesos = catalogo
+        .filter((item) => item.maquina === value)
+        .map((item) => item.proceso);
+
+      setGembaData((previous) => ({
+        ...previous,
+        maquina: value,
+        proceso: procesos.length === 1 ? procesos[0] : "",
+      }));
+
+      return;
+    }
+
     setGembaData((previous) => ({
       ...previous,
       [name]: value,
-      ...(name === "area" ? { machine: "" } : {}),
     }));
   }
 
@@ -120,8 +123,8 @@ function App() {
     event.preventDefault();
 
     if (
-      !gembaData.area ||
-      !gembaData.machine ||
+      !gembaData.maquina ||
+      !gembaData.proceso ||
       !gembaData.collaborator.trim() ||
       !gembaData.task.trim() ||
       !gembaData.auditor.trim()
@@ -142,8 +145,8 @@ function App() {
     setGembaStarted(false);
 
     setGembaData({
-      area: "",
-      machine: "",
+      maquina: "",
+      proceso: "",
       collaborator: "",
       task: "",
       auditor: "Pablo Hernández",
@@ -205,17 +208,14 @@ function App() {
 
       <main className="main-content">
         {currentPage === "dashboard" && (
-          <Dashboard
-            modules={modules}
-            onNewGemba={handleNewGemba}
-          />
+          <Dashboard modules={modules} onNewGemba={handleNewGemba} />
         )}
 
         {currentPage === "nuevo-gemba" && !gembaStarted && (
           <NewGembaForm
             gembaData={gembaData}
-            areas={areas}
-            machinesByArea={machinesByArea}
+            maquinas={maquinas}
+            procesosDisponibles={procesosDisponibles}
             currentDate={currentDate}
             onChange={handleInputChange}
             onSubmit={handleStartGemba}
@@ -344,17 +344,13 @@ function Dashboard({ modules, onNewGemba }) {
 
 function NewGembaForm({
   gembaData,
-  areas,
-  machinesByArea,
+  maquinas,
+  procesosDisponibles,
   currentDate,
   onChange,
   onSubmit,
   onCancel,
 }) {
-  const availableMachines = gembaData.area
-    ? machinesByArea[gembaData.area] || []
-    : [];
-
   return (
     <>
       <header className="page-header">
@@ -375,6 +371,7 @@ function NewGembaForm({
             <div>
               <span className="step-label">Paso 1 de 2</span>
               <h3>Datos generales</h3>
+
               <p>
                 Esta información quedará asociada a todos los hallazgos
                 registrados durante el Gemba.
@@ -391,19 +388,19 @@ function NewGembaForm({
             <label className="form-field">
               <span>
                 <Factory size={17} />
-                Área
+                Máquina / Equipo
               </span>
 
               <select
-                name="area"
-                value={gembaData.area}
+                name="maquina"
+                value={gembaData.maquina}
                 onChange={onChange}
               >
-                <option value="">Seleccionar área</option>
+                <option value="">Seleccionar máquina</option>
 
-                {areas.map((area) => (
-                  <option value={area} key={area}>
-                    {area}
+                {maquinas.map((maquina) => (
+                  <option value={maquina} key={maquina}>
+                    {maquina}
                   </option>
                 ))}
               </select>
@@ -411,25 +408,25 @@ function NewGembaForm({
 
             <label className="form-field">
               <span>
-                <Wrench size={17} />
-                Máquina / Equipo
+                <Workflow size={17} />
+                Proceso
               </span>
 
               <select
-                name="machine"
-                value={gembaData.machine}
+                name="proceso"
+                value={gembaData.proceso}
                 onChange={onChange}
-                disabled={!gembaData.area}
+                disabled={!gembaData.maquina}
               >
                 <option value="">
-                  {gembaData.area
-                    ? "Seleccionar máquina"
-                    : "Primero seleccioná un área"}
+                  {!gembaData.maquina
+                    ? "Primero seleccioná una máquina"
+                    : "Seleccionar proceso"}
                 </option>
 
-                {availableMachines.map((machine) => (
-                  <option value={machine} key={machine}>
-                    {machine}
+                {procesosDisponibles.map((proceso) => (
+                  <option value={proceso} key={proceso}>
+                    {proceso}
                   </option>
                 ))}
               </select>
@@ -461,7 +458,7 @@ function NewGembaForm({
                 name="task"
                 value={gembaData.task}
                 onChange={onChange}
-                placeholder="Ej. Cambio de troquel"
+                placeholder="Ej. Retiro de material atascado"
               />
             </label>
 
@@ -506,8 +503,8 @@ function NewGembaForm({
           <h3>Antes de comenzar</h3>
 
           <p>
-            Identificá claramente dónde y qué actividad estás observando.
-            Esto permitirá relacionar correctamente los hallazgos y acciones.
+            Identificá claramente la máquina, el proceso y la actividad que
+            estás observando.
           </p>
 
           <div className="help-list">
@@ -564,13 +561,13 @@ function GembaModules({
 
       <section className="gemba-context-card">
         <div className="context-item">
-          <span>Área</span>
-          <strong>{gembaData.area}</strong>
+          <span>Máquina / Equipo</span>
+          <strong>{gembaData.maquina}</strong>
         </div>
 
         <div className="context-item">
-          <span>Máquina / Equipo</span>
-          <strong>{gembaData.machine}</strong>
+          <span>Proceso</span>
+          <strong>{gembaData.proceso}</strong>
         </div>
 
         <div className="context-item">
@@ -622,9 +619,7 @@ function GembaModules({
                   <div className="module-title-row">
                     <h4>{module.name}</h4>
 
-                    <span className="status-pill">
-                      {module.status}
-                    </span>
+                    <span className="status-pill">{module.status}</span>
                   </div>
 
                   <p>{module.description}</p>
