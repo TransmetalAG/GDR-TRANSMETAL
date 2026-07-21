@@ -371,7 +371,7 @@ function NewGembaForm({
           <h2>Iniciar Gemba Walk</h2>
 
           <p>
-            Registrá el contexto de la observación antes de iniciar el
+            Registra el contexto de la observación antes de iniciar el
             recorrido.
           </p>
         </div>
@@ -538,22 +538,22 @@ function NewGembaForm({
           <div className="help-list">
             <div>
               <CheckCircle2 size={18} />
-              <span>Observá el trabajo real.</span>
+              <span>Observa el trabajo real.</span>
             </div>
 
             <div>
               <CheckCircle2 size={18} />
-              <span>Conversá con el colaborador.</span>
+              <span>Conversa con el colaborador.</span>
             </div>
 
             <div>
               <CheckCircle2 size={18} />
-              <span>Registrá evidencia cuando aporte valor.</span>
+              <span>Registra evidencia cuando aporte valor.</span>
             </div>
 
             <div>
               <CheckCircle2 size={18} />
-              <span>Buscá oportunidades, no culpables.</span>
+              <span>Busca oportunidades, no culpables.</span>
             </div>
           </div>
         </aside>
