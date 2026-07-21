@@ -21,10 +21,12 @@ import {
 
 import { catalogo } from "./data/CatalogoMaquinas.js";
 import { colaboradores } from "./data/CatalogoColaboradores.js";
+import Seguridad from "./modules/Seguridad.jsx";
 
 function App() {
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [gembaStarted, setGembaStarted] = useState(false);
+  const [activeGembaModule, setActiveGembaModule] = useState(null);
 
   const [gembaData, setGembaData] = useState({
     maquina: "",
@@ -34,43 +36,51 @@ function App() {
     auditor: "Pablo Hernández",
   });
 
-  const modules = [
+  const [moduleResults, setModuleResults] = useState({
+    seguridad: null,
+    calidad: null,
+    proceso: null,
+    mantenimiento: null,
+    "cinco-s": null,
+  });
+
+  const baseModules = [
     {
       id: "seguridad",
       name: "Seguridad",
       description: "Condiciones físicas, comportamiento y procedimientos",
       icon: ShieldCheck,
-      status: "Pendiente",
     },
     {
       id: "calidad",
       name: "Calidad",
       description: "Producto, controles de proceso y estándares",
       icon: Award,
-      status: "Pendiente",
     },
     {
       id: "proceso",
       name: "Proceso / Productividad",
       description: "Desperdicios Lean y oportunidades de mejora",
       icon: Gauge,
-      status: "Pendiente",
     },
     {
       id: "mantenimiento",
       name: "Mantenimiento",
       description: "Detección y seguimiento de anomalías",
       icon: Wrench,
-      status: "Pendiente",
     },
     {
       id: "cinco-s",
       name: "5S + Gestión Visual",
       description: "Orden, limpieza, estándares y gestión visual",
       icon: Sparkles,
-      status: "Pendiente",
     },
   ];
+
+  const modules = baseModules.map((module) => ({
+    ...module,
+    status: moduleResults[module.id] ? "Completado" : "Pendiente",
+  }));
 
   const navigation = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -102,6 +112,8 @@ function App() {
     dateStyle: "long",
     timeStyle: "short",
   }).format(new Date());
+
+  const completedModules = Object.values(moduleResults).filter(Boolean).length;
 
   function handleInputChange(event) {
     const { name, value } = event.target;
@@ -141,15 +153,26 @@ function App() {
     }
 
     setGembaStarted(true);
+    setActiveGembaModule(null);
   }
 
   function handleNewGemba() {
     setCurrentPage("nuevo-gemba");
     setGembaStarted(false);
+    setActiveGembaModule(null);
+
+    setModuleResults({
+      seguridad: null,
+      calidad: null,
+      proceso: null,
+      mantenimiento: null,
+      "cinco-s": null,
+    });
   }
 
   function handleCancelGemba() {
     setGembaStarted(false);
+    setActiveGembaModule(null);
 
     setGembaData({
       maquina: "",
@@ -159,7 +182,35 @@ function App() {
       auditor: "Pablo Hernández",
     });
 
+    setModuleResults({
+      seguridad: null,
+      calidad: null,
+      proceso: null,
+      mantenimiento: null,
+      "cinco-s": null,
+    });
+
     setCurrentPage("dashboard");
+  }
+
+  function handleOpenModule(moduleId) {
+    if (moduleId === "seguridad") {
+      setActiveGembaModule("seguridad");
+      return;
+    }
+
+    alert(
+      `El módulo ${baseModules.find((item) => item.id === moduleId)?.name} todavía no está construido.`
+    );
+  }
+
+  function handleCompleteSafety(result) {
+    setModuleResults((previous) => ({
+      ...previous,
+      seguridad: result,
+    }));
+
+    setActiveGembaModule(null);
   }
 
   return (
@@ -193,6 +244,7 @@ function App() {
 
                   if (item.id === "nuevo-gemba") {
                     setGembaStarted(false);
+                    setActiveGembaModule(null);
                   }
                 }}
               >
@@ -221,28 +273,44 @@ function App() {
           />
         )}
 
-        {currentPage === "nuevo-gemba" && !gembaStarted && (
-          <NewGembaForm
-            gembaData={gembaData}
-            maquinas={maquinas}
-            procesosDisponibles={procesosDisponibles}
-            colaboradores={colaboradoresOrdenados}
-            currentDate={currentDate}
-            onChange={handleInputChange}
-            onSubmit={handleStartGemba}
-            onCancel={() => setCurrentPage("dashboard")}
-          />
-        )}
+        {currentPage === "nuevo-gemba" &&
+          !gembaStarted &&
+          !activeGembaModule && (
+            <NewGembaForm
+              gembaData={gembaData}
+              maquinas={maquinas}
+              procesosDisponibles={procesosDisponibles}
+              colaboradores={colaboradoresOrdenados}
+              currentDate={currentDate}
+              onChange={handleInputChange}
+              onSubmit={handleStartGemba}
+              onCancel={() => setCurrentPage("dashboard")}
+            />
+          )}
 
-        {currentPage === "nuevo-gemba" && gembaStarted && (
-          <GembaModules
-            gembaData={gembaData}
-            modules={modules}
-            currentDate={currentDate}
-            onBack={() => setGembaStarted(false)}
-            onCancel={handleCancelGemba}
-          />
-        )}
+        {currentPage === "nuevo-gemba" &&
+          gembaStarted &&
+          !activeGembaModule && (
+            <GembaModules
+              gembaData={gembaData}
+              modules={modules}
+              currentDate={currentDate}
+              completedModules={completedModules}
+              onBack={() => setGembaStarted(false)}
+              onCancel={handleCancelGemba}
+              onOpenModule={handleOpenModule}
+            />
+          )}
+
+        {currentPage === "nuevo-gemba" &&
+          gembaStarted &&
+          activeGembaModule === "seguridad" && (
+            <Seguridad
+              gembaData={gembaData}
+              onBack={() => setActiveGembaModule(null)}
+              onComplete={handleCompleteSafety}
+            />
+          )}
 
         {currentPage === "plan-accion" && (
           <PlaceholderPage
@@ -371,7 +439,7 @@ function NewGembaForm({
           <h2>Iniciar Gemba Walk</h2>
 
           <p>
-            Registra el contexto de la observación antes de iniciar el
+            Registrá el contexto de la observación antes de iniciar el
             recorrido.
           </p>
         </div>
@@ -382,7 +450,6 @@ function NewGembaForm({
           <div className="form-card-header">
             <div>
               <span className="step-label">Paso 1 de 2</span>
-
               <h3>Datos generales</h3>
 
               <p>
@@ -538,22 +605,22 @@ function NewGembaForm({
           <div className="help-list">
             <div>
               <CheckCircle2 size={18} />
-              <span>Observa el trabajo real.</span>
+              <span>Observá el trabajo real.</span>
             </div>
 
             <div>
               <CheckCircle2 size={18} />
-              <span>Conversa con el colaborador.</span>
+              <span>Conversá con el colaborador.</span>
             </div>
 
             <div>
               <CheckCircle2 size={18} />
-              <span>Registra evidencia cuando aporte valor.</span>
+              <span>Registrá evidencia cuando aporte valor.</span>
             </div>
 
             <div>
               <CheckCircle2 size={18} />
-              <span>Busca oportunidades, no culpables.</span>
+              <span>Buscá oportunidades, no culpables.</span>
             </div>
           </div>
         </aside>
@@ -566,8 +633,10 @@ function GembaModules({
   gembaData,
   modules,
   currentDate,
+  completedModules,
   onBack,
   onCancel,
+  onOpenModule,
 }) {
   return (
     <>
@@ -627,17 +696,18 @@ function GembaModules({
         <div className="gemba-module-grid">
           {modules.map((module) => {
             const Icon = module.icon;
+            const completed = module.status === "Completado";
 
             return (
               <button
                 type="button"
-                className="gemba-module-card"
-                key={module.id}
-                onClick={() =>
-                  alert(
-                    `El módulo ${module.name} será el siguiente que construiremos.`
-                  )
+                className={
+                  completed
+                    ? "gemba-module-card completed"
+                    : "gemba-module-card"
                 }
+                key={module.id}
+                onClick={() => onOpenModule(module.id)}
               >
                 <div className={`module-icon ${module.id}`}>
                   <Icon size={27} />
@@ -647,7 +717,14 @@ function GembaModules({
                   <div className="module-title-row">
                     <h4>{module.name}</h4>
 
-                    <span className="status-pill">
+                    <span
+                      className={
+                        completed
+                          ? "status-pill completed"
+                          : "status-pill"
+                      }
+                    >
+                      {completed && <CheckCircle2 size={13} />}
                       {module.status}
                     </span>
                   </div>
@@ -655,7 +732,10 @@ function GembaModules({
                   <p>{module.description}</p>
 
                   <span className="enter-module">
-                    Iniciar revisión
+                    {completed
+                      ? "Revisar nuevamente"
+                      : "Iniciar revisión"}
+
                     <ArrowRight size={17} />
                   </span>
                 </div>
@@ -671,7 +751,7 @@ function GembaModules({
           </button>
 
           <div className="gemba-progress">
-            <strong>0 de 5</strong>
+            <strong>{completedModules} de 5</strong>
             <span>módulos revisados</span>
           </div>
         </div>
