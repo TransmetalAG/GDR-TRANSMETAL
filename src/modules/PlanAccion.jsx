@@ -4,15 +4,14 @@ import {
   Plus,
   Search,
   Filter,
-  AlertTriangle,
-  CheckCircle2,
   CalendarDays,
   User,
-  Factory,
   Workflow,
-  Pencil,
   Trash2,
+  ChevronDown,
   X,
+  CheckCircle2,
+  Factory,
 } from "lucide-react";
 
 import { catalogo } from "../data/CatalogoMaquinas.js";
@@ -20,6 +19,7 @@ import { colaboradores } from "../data/CatalogoColaboradores.js";
 import { supabase } from "../lib/supabase.js";
 
 const ESTADOS = [
+  "Sin planificar",
   "Pendiente",
   "En proceso",
   "Terminada",
@@ -30,13 +30,6 @@ const PILARES = [
   "Calidad",
   "Proceso / Productividad",
   "Otro",
-];
-
-const PRIORIDADES = [
-  "Baja",
-  "Media",
-  "Alta",
-  "Crítica",
 ];
 
 function toDateString(date) {
@@ -81,8 +74,19 @@ function getMonthRange(dateValue = new Date()) {
       ? new Date(`${dateValue}T12:00:00`)
       : new Date(dateValue);
 
-  const start = new Date(date.getFullYear(), date.getMonth(), 1, 12);
-  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 12);
+  const start = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    1,
+    12
+  );
+
+  const end = new Date(
+    date.getFullYear(),
+    date.getMonth() + 1,
+    0,
+    12
+  );
 
   return {
     start: toDateString(start),
@@ -91,6 +95,12 @@ function getMonthRange(dateValue = new Date()) {
 }
 
 function normalizarAccion(row) {
+  const sinPlan =
+    row.origen === "Gemba" &&
+    !row.que &&
+    !row.responsable &&
+    !row.fecha_compromiso;
+
   return {
     id: row.id,
     gembaId: row.gemba_id || null,
@@ -103,24 +113,19 @@ function normalizarAccion(row) {
     colaborador: row.colaborador || "",
 
     causa: row.hallazgo || "",
-    prioridad: row.prioridad || "Media",
-
     que: row.que || "",
-    porQue: row.por_que || "",
+    como: row.como || "",
     quien: row.responsable || "",
     cuando: row.fecha_compromiso || "",
-    como: row.como || "",
-    costoEstimado:
-      row.costo_estimado !== null &&
-      row.costo_estimado !== undefined
-        ? Number(row.costo_estimado)
-        : "",
 
-    estado: row.estado || "Pendiente",
+    estado:
+      sinPlan && row.estado === "Pendiente"
+        ? "Sin planificar"
+        : row.estado || "Pendiente",
+
     observaciones: row.observaciones || "",
     evidencia: row.evidencia || "",
     fechaCierre: row.fecha_cierre || null,
-
     createdAt: row.created_at || null,
   };
 }
@@ -129,10 +134,13 @@ function PlanAccion() {
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
-  const [modoEdicion, setModoEdicion] = useState(null);
-
   const [acciones, setAcciones] = useState([]);
+
+  const [mostrarNuevaAccion, setMostrarNuevaAccion] =
+    useState(false);
+
+  const [editandoCelda, setEditandoCelda] = useState(null);
+  const [valorEdicion, setValorEdicion] = useState("");
 
   const [filtros, setFiltros] = useState({
     busqueda: "",
@@ -144,31 +152,24 @@ function PlanAccion() {
   });
 
   const [nuevaAccion, setNuevaAccion] = useState({
-    origen: "Manual",
-
     pilar: "",
-    maquina: "",
-    proceso: "",
-    auditor: "",
-    colaborador: "",
-
     causa: "",
-    prioridad: "Media",
-
     que: "",
-    porQue: "",
+    como: "",
     quien: "",
     cuando: "",
-    como: "",
-    costoEstimado: "",
-
     estado: "Pendiente",
+    maquina: "",
+    proceso: "",
     observaciones: "",
-    evidencia: "",
   });
 
   const maquinas = useMemo(() => {
-    return [...new Set(catalogo.map((item) => item.maquina))].sort((a, b) =>
+    return [
+      ...new Set(
+        catalogo.map((item) => item.maquina)
+      ),
+    ].sort((a, b) =>
       a.localeCompare(b, "es")
     );
   }, []);
@@ -179,10 +180,15 @@ function PlanAccion() {
     return [
       ...new Set(
         catalogo
-          .filter((item) => item.maquina === nuevaAccion.maquina)
+          .filter(
+            (item) =>
+              item.maquina === nuevaAccion.maquina
+          )
           .map((item) => item.proceso)
       ),
-    ].sort((a, b) => a.localeCompare(b, "es"));
+    ].sort((a, b) =>
+      a.localeCompare(b, "es")
+    );
   }, [nuevaAccion.maquina]);
 
   const responsables = useMemo(() => {
@@ -190,7 +196,12 @@ function PlanAccion() {
       .map((accion) => accion.quien)
       .filter(Boolean);
 
-    return [...new Set([...colaboradores, ...existentes])].sort((a, b) =>
+    return [
+      ...new Set([
+        ...colaboradores,
+        ...existentes,
+      ]),
+    ].sort((a, b) =>
       a.localeCompare(b, "es")
     );
   }, [acciones]);
@@ -205,10 +216,15 @@ function PlanAccion() {
     const { data, error } = await supabase
       .from("plan_accion")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_at", {
+        ascending: false,
+      });
 
     if (error) {
-      console.error("Error al cargar plan de acción:", error);
+      console.error(
+        "Error al cargar Plan de Acción:",
+        error
+      );
 
       alert(
         `No se pudo cargar el Plan de Acción.\n\n${error.message}`
@@ -218,42 +234,71 @@ function PlanAccion() {
       return;
     }
 
-    setAcciones((data || []).map(normalizarAccion));
+    setAcciones(
+      (data || []).map(normalizarAccion)
+    );
+
     setLoading(false);
   }
 
   function estaVencida(accion) {
-    if (accion.estado === "Terminada") return false;
-    if (!accion.cuando) return false;
+    if (
+      accion.estado === "Terminada" ||
+      accion.estado === "Sin planificar"
+    ) {
+      return false;
+    }
 
-    return accion.cuando < toDateString(new Date());
+    if (!accion.cuando) {
+      return false;
+    }
+
+    return (
+      accion.cuando <
+      toDateString(new Date())
+    );
   }
 
   const indicadores = useMemo(() => {
     return {
+      sinPlanificar: acciones.filter(
+        (accion) =>
+          accion.estado === "Sin planificar"
+      ).length,
+
       pendientes: acciones.filter(
-        (accion) => accion.estado === "Pendiente"
+        (accion) =>
+          accion.estado === "Pendiente"
       ).length,
 
       enProceso: acciones.filter(
-        (accion) => accion.estado === "En proceso"
+        (accion) =>
+          accion.estado === "En proceso"
       ).length,
 
       terminadas: acciones.filter(
-        (accion) => accion.estado === "Terminada"
+        (accion) =>
+          accion.estado === "Terminada"
       ).length,
 
-      vencidas: acciones.filter(estaVencida).length,
+      vencidas: acciones.filter(
+        estaVencida
+      ).length,
     };
   }, [acciones]);
 
   const accionesFiltradas = useMemo(() => {
-    const texto = filtros.busqueda.trim().toLowerCase();
+    const texto = filtros.busqueda
+      .trim()
+      .toLowerCase();
 
     let rangoFecha = null;
 
     if (filtros.periodo === "semana") {
-      const inicio = getMonday(filtros.fechaReferencia);
+      const inicio = getMonday(
+        filtros.fechaReferencia
+      );
+
       rangoFecha = {
         start: inicio,
         end: addDays(inicio, 6),
@@ -261,21 +306,34 @@ function PlanAccion() {
     }
 
     if (filtros.periodo === "mes") {
-      rangoFecha = getMonthRange(filtros.fechaReferencia);
+      rangoFecha = getMonthRange(
+        filtros.fechaReferencia
+      );
     }
 
     return acciones.filter((accion) => {
       const coincideBusqueda =
         !texto ||
-        accion.causa.toLowerCase().includes(texto) ||
-        accion.que.toLowerCase().includes(texto) ||
-        accion.como.toLowerCase().includes(texto) ||
-        accion.quien.toLowerCase().includes(texto) ||
-        accion.pilar.toLowerCase().includes(texto);
+        accion.pilar
+          .toLowerCase()
+          .includes(texto) ||
+        accion.causa
+          .toLowerCase()
+          .includes(texto) ||
+        accion.que
+          .toLowerCase()
+          .includes(texto) ||
+        accion.como
+          .toLowerCase()
+          .includes(texto) ||
+        accion.quien
+          .toLowerCase()
+          .includes(texto);
 
       const coincideResponsable =
         !filtros.responsable ||
-        accion.quien === filtros.responsable;
+        accion.quien ===
+          filtros.responsable;
 
       const coincidePilar =
         !filtros.pilar ||
@@ -283,18 +341,24 @@ function PlanAccion() {
 
       let coincideEstado = true;
 
-      if (filtros.estado === "Atrasadas") {
-        coincideEstado = estaVencida(accion);
+      if (
+        filtros.estado === "Atrasadas"
+      ) {
+        coincideEstado =
+          estaVencida(accion);
       } else if (filtros.estado) {
-        coincideEstado = accion.estado === filtros.estado;
+        coincideEstado =
+          accion.estado === filtros.estado;
       }
 
       const coincidePeriodo =
         !rangoFecha ||
         (
           accion.cuando &&
-          accion.cuando >= rangoFecha.start &&
-          accion.cuando <= rangoFecha.end
+          accion.cuando >=
+            rangoFecha.start &&
+          accion.cuando <=
+            rangoFecha.end
         );
 
       return (
@@ -307,108 +371,6 @@ function PlanAccion() {
     });
   }, [acciones, filtros]);
 
-  function limpiarFormulario() {
-    setNuevaAccion({
-      origen: "Manual",
-
-      pilar: "",
-      maquina: "",
-      proceso: "",
-      auditor: "",
-      colaborador: "",
-
-      causa: "",
-      prioridad: "Media",
-
-      que: "",
-      porQue: "",
-      quien: "",
-      cuando: "",
-      como: "",
-      costoEstimado: "",
-
-      estado: "Pendiente",
-      observaciones: "",
-      evidencia: "",
-    });
-
-    setModoEdicion(null);
-  }
-
-  function abrirNuevaAccion() {
-    limpiarFormulario();
-    setMostrarFormulario(true);
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  }
-
-  function editarAccion(accion) {
-    setModoEdicion(accion.id);
-
-    setNuevaAccion({
-      origen: accion.origen || "Manual",
-
-      pilar: accion.pilar || "",
-      maquina: accion.maquina || "",
-      proceso: accion.proceso || "",
-      auditor: accion.auditor || "",
-      colaborador: accion.colaborador || "",
-
-      causa: accion.causa || "",
-      prioridad: accion.prioridad || "Media",
-
-      que: accion.que || "",
-      porQue: accion.porQue || "",
-      quien: accion.quien || "",
-      cuando: accion.cuando || "",
-      como: accion.como || "",
-      costoEstimado:
-        accion.costoEstimado === ""
-          ? ""
-          : String(accion.costoEstimado),
-
-      estado: accion.estado || "Pendiente",
-      observaciones: accion.observaciones || "",
-      evidencia: accion.evidencia || "",
-    });
-
-    setMostrarFormulario(true);
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  }
-
-  function handleAccionChange(event) {
-    const { name, value } = event.target;
-
-    if (name === "maquina") {
-      const procesos = catalogo
-        .filter((item) => item.maquina === value)
-        .map((item) => item.proceso);
-
-      setNuevaAccion((previous) => ({
-        ...previous,
-        maquina: value,
-        proceso:
-          procesos.length === 1
-            ? procesos[0]
-            : "",
-      }));
-
-      return;
-    }
-
-    setNuevaAccion((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
-  }
-
   function handleFiltroChange(event) {
     const { name, value } = event.target;
 
@@ -418,141 +380,189 @@ function PlanAccion() {
     }));
   }
 
-  async function guardarAccion(event) {
-    event.preventDefault();
-
-    if (!nuevaAccion.causa.trim()) {
-      alert("Describí la causa o hallazgo.");
-      return;
-    }
-
-    if (!nuevaAccion.pilar) {
-      alert("Seleccioná el pilar.");
-      return;
-    }
-
-    if (!nuevaAccion.que.trim()) {
-      alert("Indicá qué acción se realizará.");
-      return;
-    }
-
-    if (!nuevaAccion.quien.trim()) {
-      alert("Indicá quién será responsable.");
-      return;
-    }
-
-    if (!nuevaAccion.cuando) {
-      alert("Seleccioná cuándo debe completarse.");
-      return;
-    }
-
-    const costo =
-      nuevaAccion.costoEstimado === ""
-        ? null
-        : Number(nuevaAccion.costoEstimado);
-
-    if (
-      costo !== null &&
-      (!Number.isFinite(costo) || costo < 0)
-    ) {
-      alert("Ingresá un costo estimado válido.");
-      return;
-    }
-
-    setGuardando(true);
-
-    const payload = {
-      origen: nuevaAccion.origen || "Manual",
-
-      pilar: nuevaAccion.pilar,
-
-      maquina:
-        nuevaAccion.maquina || null,
-
-      proceso:
-        nuevaAccion.proceso || null,
-
-      auditor:
-        nuevaAccion.auditor || null,
-
-      colaborador:
-        nuevaAccion.colaborador || null,
-
-      hallazgo: nuevaAccion.causa.trim(),
-
-      prioridad: nuevaAccion.prioridad,
-
-      que: nuevaAccion.que.trim(),
-
-      por_que:
-        nuevaAccion.porQue.trim() || null,
-
-      responsable:
-        nuevaAccion.quien.trim(),
-
-      fecha_compromiso:
-        nuevaAccion.cuando,
-
-      como:
-        nuevaAccion.como.trim() || null,
-
-      costo_estimado: costo,
-
-      estado: nuevaAccion.estado,
-
-      observaciones:
-        nuevaAccion.observaciones.trim() || null,
-
-      evidencia:
-        nuevaAccion.evidencia.trim() || null,
-
-      fecha_cierre:
-        nuevaAccion.estado === "Terminada"
-          ? new Date().toISOString()
-          : null,
-    };
-
-    let error;
-
-    if (modoEdicion) {
-      const response = await supabase
-        .from("plan_accion")
-        .update(payload)
-        .eq("id", modoEdicion);
-
-      error = response.error;
-    } else {
-      const response = await supabase
-        .from("plan_accion")
-        .insert(payload);
-
-      error = response.error;
-    }
-
-    if (error) {
-      console.error("Error al guardar acción:", error);
-
-      alert(
-        `No se pudo guardar la acción.\n\n${error.message}`
-      );
-
-      setGuardando(false);
-      return;
-    }
-
-    limpiarFormulario();
-    setMostrarFormulario(false);
-    setGuardando(false);
-
-    await cargarAcciones();
+  function limpiarFiltros() {
+    setFiltros({
+      busqueda: "",
+      responsable: "",
+      pilar: "",
+      estado: "",
+      periodo: "",
+      fechaReferencia:
+        toDateString(new Date()),
+    });
   }
 
-  async function eliminarAccion(accion) {
-    const confirmar = window.confirm(
-      `¿Seguro que deseás eliminar esta acción?\n\n${accion.causa}\n\nEsta acción no se puede deshacer.`
+  function iniciarEdicion(
+    accion,
+    campo
+  ) {
+    setEditandoCelda({
+      id: accion.id,
+      campo,
+    });
+
+    setValorEdicion(
+      accion[campo] ?? ""
+    );
+  }
+
+  function cancelarEdicion() {
+    setEditandoCelda(null);
+    setValorEdicion("");
+  }
+
+  async function guardarCelda(
+    accion,
+    campo,
+    valor
+  ) {
+    const mapaCampos = {
+      pilar: "pilar",
+      causa: "hallazgo",
+      que: "que",
+      como: "como",
+      quien: "responsable",
+      cuando: "fecha_compromiso",
+      estado: "estado",
+    };
+
+    const columnaDb =
+      mapaCampos[campo];
+
+    if (!columnaDb) {
+      cancelarEdicion();
+      return;
+    }
+
+    const valorLimpio =
+      typeof valor === "string"
+        ? valor.trim()
+        : valor;
+
+    let nuevoEstado =
+      accion.estado;
+
+    const accionProyectada = {
+      ...accion,
+      [campo]: valorLimpio,
+    };
+
+    const tienePlanMinimo =
+      accionProyectada.que &&
+      accionProyectada.quien &&
+      accionProyectada.cuando;
+
+    if (
+      campo !== "estado" &&
+      accion.estado === "Sin planificar" &&
+      tienePlanMinimo
+    ) {
+      nuevoEstado = "Pendiente";
+    }
+
+    if (
+      campo === "estado"
+    ) {
+      nuevoEstado = valorLimpio;
+    }
+
+    const payload = {
+      [columnaDb]:
+        valorLimpio || null,
+    };
+
+    if (
+      nuevoEstado !== accion.estado
+    ) {
+      payload.estado =
+        nuevoEstado;
+    }
+
+    if (
+      campo === "estado" ||
+      nuevoEstado !== accion.estado
+    ) {
+      payload.fecha_cierre =
+        nuevoEstado === "Terminada"
+          ? new Date().toISOString()
+          : null;
+    }
+
+    setAcciones((previous) =>
+      previous.map((item) =>
+        item.id === accion.id
+          ? {
+              ...item,
+              [campo]: valorLimpio,
+              estado:
+                nuevoEstado,
+              fechaCierre:
+                nuevoEstado ===
+                "Terminada"
+                  ? new Date().toISOString()
+                  : null,
+            }
+          : item
+      )
     );
 
-    if (!confirmar) return;
+    cancelarEdicion();
+
+    const { error } = await supabase
+      .from("plan_accion")
+      .update(payload)
+      .eq("id", accion.id);
+
+    if (error) {
+      console.error(
+        "Error al actualizar celda:",
+        error
+      );
+
+      alert(
+        `No se pudo guardar el cambio.\n\n${error.message}`
+      );
+
+      await cargarAcciones();
+    }
+  }
+
+  function manejarTeclaEdicion(
+    event,
+    accion,
+    campo
+  ) {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+
+      guardarCelda(
+        accion,
+        campo,
+        valorEdicion
+      );
+    }
+
+    if (
+      event.key === "Escape"
+    ) {
+      cancelarEdicion();
+    }
+  }
+
+  async function eliminarAccion(
+    accion
+  ) {
+    const confirmar =
+      window.confirm(
+        `¿Seguro que deseás eliminar esta acción?\n\n${accion.causa}\n\nEsta acción no se puede deshacer.`
+      );
+
+    if (!confirmar) {
+      return;
+    }
 
     const { error } = await supabase
       .from("plan_accion")
@@ -560,7 +570,10 @@ function PlanAccion() {
       .eq("id", accion.id);
 
     if (error) {
-      console.error("Error al eliminar acción:", error);
+      console.error(
+        "Error al eliminar acción:",
+        error
+      );
 
       alert(
         `No se pudo eliminar la acción.\n\n${error.message}`
@@ -571,110 +584,174 @@ function PlanAccion() {
 
     setAcciones((previous) =>
       previous.filter(
-        (item) => item.id !== accion.id
+        (item) =>
+          item.id !== accion.id
       )
     );
-
-    if (modoEdicion === accion.id) {
-      limpiarFormulario();
-      setMostrarFormulario(false);
-    }
   }
 
-  async function cambiarEstadoDirecto(
-    accionId,
-    nuevoEstado
+  function handleNuevaAccionChange(
+    event
   ) {
-    const accionAnterior = acciones.find(
-      (item) => item.id === accionId
-    );
+    const { name, value } =
+      event.target;
 
-    if (!accionAnterior) return;
+    if (name === "maquina") {
+      const procesos = catalogo
+        .filter(
+          (item) =>
+            item.maquina === value
+        )
+        .map(
+          (item) => item.proceso
+        );
 
-    setAcciones((previous) =>
-      previous.map((item) =>
-        item.id === accionId
-          ? {
-              ...item,
-              estado: nuevoEstado,
-              fechaCierre:
-                nuevoEstado === "Terminada"
-                  ? new Date().toISOString()
-                  : null,
-            }
-          : item
-      )
+      setNuevaAccion(
+        (previous) => ({
+          ...previous,
+          maquina: value,
+          proceso:
+            procesos.length === 1
+              ? procesos[0]
+              : "",
+        })
+      );
+
+      return;
+    }
+
+    setNuevaAccion(
+      (previous) => ({
+        ...previous,
+        [name]: value,
+      })
     );
+  }
+
+  async function crearAccionManual(
+    event
+  ) {
+    event.preventDefault();
+
+    if (
+      !nuevaAccion.pilar
+    ) {
+      alert(
+        "Seleccioná el pilar."
+      );
+      return;
+    }
+
+    if (
+      !nuevaAccion.causa.trim()
+    ) {
+      alert(
+        "Ingresá la causa."
+      );
+      return;
+    }
+
+    setGuardando(true);
 
     const { error } = await supabase
       .from("plan_accion")
-      .update({
-        estado: nuevoEstado,
-        fecha_cierre:
-          nuevoEstado === "Terminada"
-            ? new Date().toISOString()
-            : null,
-      })
-      .eq("id", accionId);
+      .insert({
+        origen: "Manual",
+        pilar:
+          nuevaAccion.pilar,
+        hallazgo:
+          nuevaAccion.causa.trim(),
+        que:
+          nuevaAccion.que.trim() ||
+          null,
+        como:
+          nuevaAccion.como.trim() ||
+          null,
+        responsable:
+          nuevaAccion.quien.trim() ||
+          null,
+        fecha_compromiso:
+          nuevaAccion.cuando ||
+          null,
+        estado:
+          nuevaAccion.estado ||
+          "Pendiente",
+        maquina:
+          nuevaAccion.maquina ||
+          null,
+        proceso:
+          nuevaAccion.proceso ||
+          null,
+        observaciones:
+          nuevaAccion.observaciones.trim() ||
+          null,
+      });
 
     if (error) {
       console.error(
-        "Error al cambiar estado:",
+        "Error al crear acción:",
         error
       );
 
-      setAcciones((previous) =>
-        previous.map((item) =>
-          item.id === accionId
-            ? accionAnterior
-            : item
-        )
-      );
-
       alert(
-        `No se pudo cambiar el estado.\n\n${error.message}`
+        `No se pudo crear la acción.\n\n${error.message}`
       );
-    }
-  }
 
-  function getEstiloEstado(estado) {
-    if (estado === "Terminada") {
-      return {
-        background: "#dcfce7",
-        color: "#15803d",
-        border: "1px solid #bbf7d0",
-      };
+      setGuardando(false);
+      return;
     }
 
-    if (estado === "En proceso") {
-      return {
-        background: "#fef3c7",
-        color: "#b45309",
-        border: "1px solid #fde68a",
-      };
-    }
-
-    return {
-      background: "#fee2e2",
-      color: "#b91c1c",
-      border: "1px solid #fecaca",
-    };
-  }
-
-  function limpiarFiltros() {
-    setFiltros({
-      busqueda: "",
-      responsable: "",
+    setNuevaAccion({
       pilar: "",
-      estado: "",
-      periodo: "",
-      fechaReferencia: toDateString(new Date()),
+      causa: "",
+      que: "",
+      como: "",
+      quien: "",
+      cuando: "",
+      estado: "Pendiente",
+      maquina: "",
+      proceso: "",
+      observaciones: "",
     });
+
+    setMostrarNuevaAccion(false);
+    setGuardando(false);
+
+    await cargarAcciones();
+  }
+
+  function getColorEstado(
+    estado
+  ) {
+    if (
+      estado === "Terminada"
+    ) {
+      return "#15803d";
+    }
+
+    if (
+      estado === "En proceso"
+    ) {
+      return "#d97706";
+    }
+
+    if (
+      estado === "Pendiente"
+    ) {
+      return "#dc2626";
+    }
+
+    return "#667085";
   }
 
   return (
     <>
-      <header className="page-header">
+      <header
+        className="page-header"
+        style={{
+          marginBottom: "14px",
+        }}
+      >
         <div>
           <span className="eyebrow">
             Gestión de acciones
@@ -685,452 +762,468 @@ function PlanAccion() {
           </h2>
 
           <p>
-            Seguimiento de hallazgos y acciones en formato de matriz.
+            Editá directamente la matriz.
+            Hacé clic sobre una celda para modificarla.
           </p>
         </div>
 
         <button
           type="button"
           className="primary-button"
-          onClick={abrirNuevaAccion}
+          onClick={() =>
+            setMostrarNuevaAccion(
+              (previous) => !previous
+            )
+          }
         >
-          <Plus size={19} />
-          Nueva acción
+          {mostrarNuevaAccion ? (
+            <>
+              <X size={18} />
+              Cerrar
+            </>
+          ) : (
+            <>
+              <Plus size={18} />
+              Nueva acción
+            </>
+          )}
         </button>
       </header>
 
-      <section className="kpi-grid">
+      <section
+        className="kpi-grid"
+        style={{
+          marginBottom: "14px",
+        }}
+      >
+        <div className="kpi-card">
+          <span>Sin planificar</span>
+          <strong>
+            {
+              indicadores.sinPlanificar
+            }
+          </strong>
+        </div>
+
         <div className="kpi-card">
           <span>Pendientes</span>
-          <strong>{indicadores.pendientes}</strong>
-          <small>Aún no iniciadas</small>
+          <strong>
+            {indicadores.pendientes}
+          </strong>
         </div>
 
         <div className="kpi-card">
           <span>En proceso</span>
-          <strong>{indicadores.enProceso}</strong>
-          <small>Acciones activas</small>
+          <strong>
+            {indicadores.enProceso}
+          </strong>
         </div>
 
         <div className="kpi-card">
           <span>Terminadas</span>
-          <strong>{indicadores.terminadas}</strong>
-          <small>Acciones cerradas</small>
+          <strong>
+            {indicadores.terminadas}
+          </strong>
         </div>
 
         <div className="kpi-card">
-          <span>Vencidas</span>
-          <strong>{indicadores.vencidas}</strong>
-          <small>Fecha compromiso vencida</small>
+          <span>Atrasadas</span>
+          <strong>
+            {indicadores.vencidas}
+          </strong>
         </div>
       </section>
 
-      {mostrarFormulario && (
+      {mostrarNuevaAccion && (
         <section
           className="section-block"
-          style={{ marginBottom: "22px" }}
+          style={{
+            marginBottom: "14px",
+            padding: "16px",
+          }}
         >
-          <div className="section-heading">
+          <div
+            className="section-heading"
+            style={{
+              marginBottom: "12px",
+            }}
+          >
             <div>
               <span className="eyebrow">
-                {modoEdicion
-                  ? "Seguimiento"
-                  : "Nueva acción"}
+                Registro manual
               </span>
 
               <h3>
-                {modoEdicion
-                  ? "Editar Plan de Acción"
-                  : "Crear acción manual"}
+                Nueva acción
               </h3>
             </div>
-
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => {
-                limpiarFormulario();
-                setMostrarFormulario(false);
-              }}
-            >
-              <X size={17} />
-              Cerrar
-            </button>
           </div>
 
-          <form onSubmit={guardarAccion}>
-            <div className="form-grid">
+          <form
+            onSubmit={
+              crearAccionManual
+            }
+          >
+            <div
+              className="form-grid"
+              style={{
+                gap: "12px",
+              }}
+            >
               <label className="form-field">
-                <span>
-                  <Workflow size={17} />
-                  Pilar
-                </span>
+                <span>Pilar</span>
 
                 <select
                   name="pilar"
-                  value={nuevaAccion.pilar}
-                  onChange={handleAccionChange}
+                  value={
+                    nuevaAccion.pilar
+                  }
+                  onChange={
+                    handleNuevaAccionChange
+                  }
                 >
                   <option value="">
-                    Seleccionar pilar
+                    Seleccionar
                   </option>
 
-                  {PILARES.map((pilar) => (
-                    <option
-                      key={pilar}
-                      value={pilar}
-                    >
-                      {pilar}
-                    </option>
-                  ))}
+                  {PILARES.map(
+                    (pilar) => (
+                      <option
+                        key={pilar}
+                        value={pilar}
+                      >
+                        {pilar}
+                      </option>
+                    )
+                  )}
                 </select>
               </label>
 
               <label className="form-field">
                 <span>
-                  <AlertTriangle size={17} />
-                  Prioridad
-                </span>
-
-                <select
-                  name="prioridad"
-                  value={nuevaAccion.prioridad}
-                  onChange={handleAccionChange}
-                >
-                  {PRIORIDADES.map((prioridad) => (
-                    <option
-                      key={prioridad}
-                      value={prioridad}
-                    >
-                      {prioridad}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="form-field">
-                <span>
-                  <Factory size={17} />
-                  Máquina / Equipo
+                  Máquina
                 </span>
 
                 <select
                   name="maquina"
-                  value={nuevaAccion.maquina}
-                  onChange={handleAccionChange}
+                  value={
+                    nuevaAccion.maquina
+                  }
+                  onChange={
+                    handleNuevaAccionChange
+                  }
                 >
                   <option value="">
-                    Sin equipo específico
+                    Opcional
                   </option>
 
-                  {maquinas.map((maquina) => (
-                    <option
-                      key={maquina}
-                      value={maquina}
-                    >
-                      {maquina}
-                    </option>
-                  ))}
+                  {maquinas.map(
+                    (maquina) => (
+                      <option
+                        key={maquina}
+                        value={maquina}
+                      >
+                        {maquina}
+                      </option>
+                    )
+                  )}
                 </select>
               </label>
 
               <label className="form-field">
                 <span>
-                  <Workflow size={17} />
                   Proceso
                 </span>
 
                 <select
                   name="proceso"
-                  value={nuevaAccion.proceso}
-                  onChange={handleAccionChange}
-                  disabled={!nuevaAccion.maquina}
+                  value={
+                    nuevaAccion.proceso
+                  }
+                  onChange={
+                    handleNuevaAccionChange
+                  }
+                  disabled={
+                    !nuevaAccion.maquina
+                  }
                 >
                   <option value="">
-                    {!nuevaAccion.maquina
-                      ? "Seleccioná primero una máquina"
-                      : "Seleccionar proceso"}
+                    Opcional
                   </option>
 
-                  {procesosDisponibles.map((proceso) => (
-                    <option
-                      key={proceso}
-                      value={proceso}
-                    >
-                      {proceso}
-                    </option>
-                  ))}
+                  {procesosDisponibles.map(
+                    (proceso) => (
+                      <option
+                        key={proceso}
+                        value={proceso}
+                      >
+                        {proceso}
+                      </option>
+                    )
+                  )}
                 </select>
               </label>
 
               <label className="form-field form-field-full">
                 <span>
-                  <AlertTriangle size={17} />
                   Causa
                 </span>
 
-                <textarea
-                  rows="3"
+                <input
                   name="causa"
-                  value={nuevaAccion.causa}
-                  onChange={handleAccionChange}
-                  placeholder="Hallazgo o situación que origina la acción."
-                />
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>
-                  <CheckCircle2 size={17} />
-                  Qué
-                </span>
-
-                <textarea
-                  rows="3"
-                  name="que"
-                  value={nuevaAccion.que}
-                  onChange={handleAccionChange}
-                  placeholder="¿Qué se realizará?"
-                />
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>
-                  <Workflow size={17} />
-                  Cómo
-                </span>
-
-                <textarea
-                  rows="3"
-                  name="como"
-                  value={nuevaAccion.como}
-                  onChange={handleAccionChange}
-                  placeholder="¿Cómo se realizará?"
+                  value={
+                    nuevaAccion.causa
+                  }
+                  onChange={
+                    handleNuevaAccionChange
+                  }
                 />
               </label>
 
               <label className="form-field">
-                <span>
-                  <User size={17} />
-                  Quién
-                </span>
+                <span>Qué</span>
 
                 <input
-                  type="text"
+                  name="que"
+                  value={
+                    nuevaAccion.que
+                  }
+                  onChange={
+                    handleNuevaAccionChange
+                  }
+                />
+              </label>
+
+              <label className="form-field">
+                <span>Cómo</span>
+
+                <input
+                  name="como"
+                  value={
+                    nuevaAccion.como
+                  }
+                  onChange={
+                    handleNuevaAccionChange
+                  }
+                />
+              </label>
+
+              <label className="form-field">
+                <span>Quién</span>
+
+                <input
                   name="quien"
-                  value={nuevaAccion.quien}
-                  onChange={handleAccionChange}
+                  value={
+                    nuevaAccion.quien
+                  }
+                  onChange={
+                    handleNuevaAccionChange
+                  }
                   list="responsables-plan-accion"
-                  placeholder="Responsable"
                 />
 
                 <datalist id="responsables-plan-accion">
-                  {responsables.map((responsable) => (
-                    <option
-                      key={responsable}
-                      value={responsable}
-                    />
-                  ))}
+                  {responsables.map(
+                    (responsable) => (
+                      <option
+                        key={
+                          responsable
+                        }
+                        value={
+                          responsable
+                        }
+                      />
+                    )
+                  )}
                 </datalist>
               </label>
 
               <label className="form-field">
-                <span>
-                  <CalendarDays size={17} />
-                  Cuándo
-                </span>
+                <span>Cuándo</span>
 
                 <input
                   type="date"
                   name="cuando"
-                  value={nuevaAccion.cuando}
-                  onChange={handleAccionChange}
-                />
-              </label>
-
-              <label className="form-field">
-                <span>
-                  <Filter size={17} />
-                  Estado
-                </span>
-
-                <select
-                  name="estado"
-                  value={nuevaAccion.estado}
-                  onChange={handleAccionChange}
-                >
-                  {ESTADOS.map((estado) => (
-                    <option
-                      key={estado}
-                      value={estado}
-                    >
-                      {estado}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="form-field">
-                <span>
-                  <ClipboardList size={17} />
-                  Origen
-                </span>
-
-                <input
-                  type="text"
-                  value={nuevaAccion.origen}
-                  readOnly
-                  disabled
-                />
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>
-                  <ClipboardList size={17} />
-                  Observaciones
-                </span>
-
-                <textarea
-                  rows="3"
-                  name="observaciones"
-                  value={nuevaAccion.observaciones}
-                  onChange={handleAccionChange}
+                  value={
+                    nuevaAccion.cuando
+                  }
+                  onChange={
+                    handleNuevaAccionChange
+                  }
                 />
               </label>
             </div>
 
-            <div className="form-actions">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => {
-                  limpiarFormulario();
-                  setMostrarFormulario(false);
-                }}
-              >
-                Cancelar
-              </button>
-
+            <div
+              className="form-actions"
+              style={{
+                marginTop: "12px",
+              }}
+            >
               <button
                 type="submit"
                 className="primary-button"
                 disabled={guardando}
               >
-                <CheckCircle2 size={18} />
+                <CheckCircle2
+                  size={17}
+                />
 
                 {guardando
                   ? "Guardando..."
-                  : modoEdicion
-                    ? "Guardar cambios"
-                    : "Crear acción"}
+                  : "Crear acción"}
               </button>
             </div>
           </form>
         </section>
       )}
 
-      <section className="section-block">
-        <div className="section-heading">
+      <section
+        className="section-block"
+        style={{
+          padding: "16px",
+        }}
+      >
+        <div
+          className="section-heading"
+          style={{
+            marginBottom: "12px",
+          }}
+        >
           <div>
             <span className="eyebrow">
-              Seguimiento
+              Matriz principal
             </span>
 
             <h3>
-              Matriz de Plan de Acción
+              Plan de Acción
             </h3>
           </div>
 
           <p>
-            Filtrá por responsable, pilar, estado y período.
+            {accionesFiltradas.length} acciones visibles
           </p>
         </div>
 
         <div
           className="form-grid"
           style={{
-            marginBottom: "18px",
+            gap: "10px",
+            marginBottom: "10px",
           }}
         >
           <label className="form-field">
             <span>
-              <Search size={17} />
+              <Search size={15} />
               Buscar
             </span>
 
             <input
               type="text"
               name="busqueda"
-              value={filtros.busqueda}
-              onChange={handleFiltroChange}
-              placeholder="Buscar causa, qué, cómo..."
+              value={
+                filtros.busqueda
+              }
+              onChange={
+                handleFiltroChange
+              }
+              placeholder="Causa, acción, responsable..."
             />
           </label>
 
           <label className="form-field">
             <span>
-              <User size={17} />
+              <User size={15} />
               Responsable
             </span>
 
             <select
               name="responsable"
-              value={filtros.responsable}
-              onChange={handleFiltroChange}
+              value={
+                filtros.responsable
+              }
+              onChange={
+                handleFiltroChange
+              }
             >
               <option value="">
                 Todos
               </option>
 
-              {responsables.map((responsable) => (
-                <option
-                  key={responsable}
-                  value={responsable}
-                >
-                  {responsable}
-                </option>
-              ))}
+              {responsables.map(
+                (responsable) => (
+                  <option
+                    key={
+                      responsable
+                    }
+                    value={
+                      responsable
+                    }
+                  >
+                    {
+                      responsable
+                    }
+                  </option>
+                )
+              )}
             </select>
           </label>
 
           <label className="form-field">
             <span>
-              <Workflow size={17} />
+              <Workflow
+                size={15}
+              />
               Pilar
             </span>
 
             <select
               name="pilar"
-              value={filtros.pilar}
-              onChange={handleFiltroChange}
+              value={
+                filtros.pilar
+              }
+              onChange={
+                handleFiltroChange
+              }
             >
               <option value="">
                 Todos
               </option>
 
-              {PILARES.map((pilar) => (
-                <option
-                  key={pilar}
-                  value={pilar}
-                >
-                  {pilar}
-                </option>
-              ))}
+              {PILARES.map(
+                (pilar) => (
+                  <option
+                    key={pilar}
+                    value={pilar}
+                  >
+                    {pilar}
+                  </option>
+                )
+              )}
             </select>
           </label>
 
           <label className="form-field">
             <span>
-              <Filter size={17} />
+              <Filter size={15} />
               Estado
             </span>
 
             <select
               name="estado"
-              value={filtros.estado}
-              onChange={handleFiltroChange}
+              value={
+                filtros.estado
+              }
+              onChange={
+                handleFiltroChange
+              }
             >
               <option value="">
                 Todos
+              </option>
+
+              <option value="Sin planificar">
+                Sin planificar
               </option>
 
               <option value="Pendiente">
@@ -1153,17 +1246,23 @@ function PlanAccion() {
 
           <label className="form-field">
             <span>
-              <CalendarDays size={17} />
+              <CalendarDays
+                size={15}
+              />
               Período
             </span>
 
             <select
               name="periodo"
-              value={filtros.periodo}
-              onChange={handleFiltroChange}
+              value={
+                filtros.periodo
+              }
+              onChange={
+                handleFiltroChange
+              }
             >
               <option value="">
-                Todas las fechas
+                Todas
               </option>
 
               <option value="semana">
@@ -1178,16 +1277,24 @@ function PlanAccion() {
 
           <label className="form-field">
             <span>
-              <CalendarDays size={17} />
-              Fecha de referencia
+              <CalendarDays
+                size={15}
+              />
+              Fecha
             </span>
 
             <input
               type="date"
               name="fechaReferencia"
-              value={filtros.fechaReferencia}
-              onChange={handleFiltroChange}
-              disabled={!filtros.periodo}
+              value={
+                filtros.fechaReferencia
+              }
+              onChange={
+                handleFiltroChange
+              }
+              disabled={
+                !filtros.periodo
+              }
             />
           </label>
         </div>
@@ -1196,13 +1303,16 @@ function PlanAccion() {
           style={{
             display: "flex",
             justifyContent: "flex-end",
-            marginBottom: "16px",
+            marginBottom: "10px",
           }}
         >
           <button
             type="button"
             className="secondary-button"
             onClick={limpiarFiltros}
+            style={{
+              padding: "8px 12px",
+            }}
           >
             Limpiar filtros
           </button>
@@ -1210,278 +1320,545 @@ function PlanAccion() {
 
         {loading ? (
           <div
-            className="finding-entry-card"
             style={{
+              padding: "40px",
               textAlign: "center",
-              padding: "30px",
             }}
           >
-            <strong>
-              Cargando acciones...
-            </strong>
-          </div>
-        ) : accionesFiltradas.length === 0 ? (
-          <div
-            className="finding-entry-card"
-            style={{
-              textAlign: "center",
-              padding: "30px",
-            }}
-          >
-            <ClipboardList
-              size={32}
-              style={{
-                marginBottom: "10px",
-              }}
-            />
-
-            <strong>
-              No hay acciones con estos filtros.
-            </strong>
+            Cargando acciones...
           </div>
         ) : (
           <div
             style={{
               width: "100%",
               overflowX: "auto",
+              minHeight: "460px",
             }}
           >
             <table
               style={{
                 width: "100%",
-                minWidth: "1180px",
-                borderCollapse: "separate",
-                borderSpacing: 0,
+                minWidth: "1280px",
+                borderCollapse:
+                  "collapse",
+                tableLayout: "fixed",
                 background: "#fff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "14px",
-                overflow: "visible",
               }}
             >
               <thead>
                 <tr>
                   {[
-                    "Pilar",
-                    "Causa",
-                    "Qué",
-                    "Cómo",
-                    "Quién",
-                    "Cuándo",
-                    "Estado",
-                    "",
-                  ].map((titulo) => (
-                    <th
-                      key={titulo || "acciones"}
-                      style={{
-                        padding: "13px 14px",
-                        textAlign: "left",
-                        fontSize: "12px",
-                        fontWeight: 800,
-                        color: "#475467",
-                        background: "#f8fafc",
-                        borderBottom: "1px solid #e5e7eb",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {titulo}
-                    </th>
-                  ))}
+                    ["Pilar", "140px"],
+                    ["Causa", "260px"],
+                    ["Qué", "230px"],
+                    ["Cómo", "260px"],
+                    ["Quién", "170px"],
+                    ["Cuándo", "140px"],
+                    ["Estado", "150px"],
+                    ["", "55px"],
+                  ].map(
+                    ([titulo, ancho]) => (
+                      <th
+                        key={
+                          titulo ||
+                          "acciones"
+                        }
+                        style={{
+                          width: ancho,
+                          padding:
+                            "12px 10px",
+                          textAlign:
+                            "left",
+                          fontSize:
+                            "12px",
+                          fontWeight:
+                            800,
+                          color:
+                            "#344054",
+                          background:
+                            "#f8fafc",
+                          border:
+                            "1px solid #e5e7eb",
+                          position:
+                            "sticky",
+                          top: 0,
+                          zIndex: 3,
+                        }}
+                      >
+                        {titulo}
+                      </th>
+                    )
+                  )}
                 </tr>
               </thead>
 
               <tbody>
-                {accionesFiltradas.map((accion) => {
-                  const vencida = estaVencida(accion);
+                {accionesFiltradas.map(
+                  (accion) => {
+                    const vencida =
+                      estaVencida(
+                        accion
+                      );
 
-                  return (
-                    <tr
-                      key={accion.id}
-                      style={{
-                        background: vencida
-                          ? "#fffafa"
-                          : "#fff",
-                      }}
-                    >
-                      <td
+                    return (
+                      <tr
+                        key={
+                          accion.id
+                        }
                         style={{
-                          padding: "14px",
-                          borderBottom: "1px solid #eef2f7",
-                          verticalAlign: "top",
-                          width: "150px",
-                          fontSize: "12px",
-                          fontWeight: 700,
+                          background:
+                            vencida
+                              ? "#fffafa"
+                              : "#fff",
                         }}
                       >
-                        {accion.pilar || "—"}
-                      </td>
+                        {[
+                          "pilar",
+                          "causa",
+                          "que",
+                          "como",
+                          "quien",
+                          "cuando",
+                        ].map(
+                          (campo) => {
+                            const editando =
+                              editandoCelda?.id ===
+                                accion.id &&
+                              editandoCelda?.campo ===
+                                campo;
 
-                      <td
-                        style={{
-                          padding: "14px",
-                          borderBottom: "1px solid #eef2f7",
-                          verticalAlign: "top",
-                          minWidth: "220px",
-                          fontSize: "12px",
-                        }}
-                      >
-                        <strong>
-                          {accion.causa}
-                        </strong>
+                            const esFecha =
+                              campo ===
+                              "cuando";
 
-                        {vencida && (
-                          <div
-                            style={{
-                              marginTop: "7px",
-                              color: "#b91c1c",
-                              fontWeight: 800,
-                            }}
-                          >
-                            Atrasada
-                          </div>
-                        )}
-                      </td>
+                            const esLista =
+                              campo ===
+                                "pilar" ||
+                              campo ===
+                                "quien";
 
-                      <td
-                        style={{
-                          padding: "14px",
-                          borderBottom: "1px solid #eef2f7",
-                          verticalAlign: "top",
-                          minWidth: "220px",
-                          fontSize: "12px",
-                        }}
-                      >
-                        {accion.que || "—"}
-                      </td>
+                            return (
+                              <td
+                                key={
+                                  campo
+                                }
+                                onClick={() => {
+                                  if (
+                                    !editando
+                                  ) {
+                                    iniciarEdicion(
+                                      accion,
+                                      campo
+                                    );
+                                  }
+                                }}
+                                style={{
+                                  padding:
+                                    editando
+                                      ? "4px"
+                                      : "10px",
+                                  border:
+                                    "1px solid #e5e7eb",
+                                  verticalAlign:
+                                    "top",
+                                  fontSize:
+                                    "12px",
+                                  cursor:
+                                    "text",
+                                  minHeight:
+                                    "52px",
+                                  color:
+                                    campo ===
+                                      "cuando" &&
+                                    vencida
+                                      ? "#b91c1c"
+                                      : "#101828",
+                                  fontWeight:
+                                    campo ===
+                                      "cuando" &&
+                                    vencida
+                                      ? 800
+                                      : 500,
+                                }}
+                              >
+                                {editando ? (
+                                  esLista &&
+                                  campo ===
+                                    "pilar" ? (
+                                    <select
+                                      autoFocus
+                                      value={
+                                        valorEdicion
+                                      }
+                                      onChange={(
+                                        event
+                                      ) =>
+                                        setValorEdicion(
+                                          event
+                                            .target
+                                            .value
+                                        )
+                                      }
+                                      onBlur={() =>
+                                        guardarCelda(
+                                          accion,
+                                          campo,
+                                          valorEdicion
+                                        )
+                                      }
+                                      style={{
+                                        width:
+                                          "100%",
+                                        minHeight:
+                                          "38px",
+                                        border:
+                                          "1px solid #2563eb",
+                                        borderRadius:
+                                          "6px",
+                                      }}
+                                    >
+                                      {PILARES.map(
+                                        (
+                                          pilar
+                                        ) => (
+                                          <option
+                                            key={
+                                              pilar
+                                            }
+                                            value={
+                                              pilar
+                                            }
+                                          >
+                                            {
+                                              pilar
+                                            }
+                                          </option>
+                                        )
+                                      )}
+                                    </select>
+                                  ) : esLista &&
+                                    campo ===
+                                      "quien" ? (
+                                    <>
+                                      <input
+                                        autoFocus
+                                        value={
+                                          valorEdicion
+                                        }
+                                        onChange={(
+                                          event
+                                        ) =>
+                                          setValorEdicion(
+                                            event
+                                              .target
+                                              .value
+                                          )
+                                        }
+                                        onKeyDown={(
+                                          event
+                                        ) =>
+                                          manejarTeclaEdicion(
+                                            event,
+                                            accion,
+                                            campo
+                                          )
+                                        }
+                                        onBlur={() =>
+                                          guardarCelda(
+                                            accion,
+                                            campo,
+                                            valorEdicion
+                                          )
+                                        }
+                                        list="responsables-inline"
+                                        style={{
+                                          width:
+                                            "100%",
+                                          minHeight:
+                                            "38px",
+                                          border:
+                                            "1px solid #2563eb",
+                                          borderRadius:
+                                            "6px",
+                                          padding:
+                                            "6px",
+                                        }}
+                                      />
 
-                      <td
-                        style={{
-                          padding: "14px",
-                          borderBottom: "1px solid #eef2f7",
-                          verticalAlign: "top",
-                          minWidth: "220px",
-                          fontSize: "12px",
-                        }}
-                      >
-                        {accion.como || "—"}
-                      </td>
+                                      <datalist id="responsables-inline">
+                                        {responsables.map(
+                                          (
+                                            responsable
+                                          ) => (
+                                            <option
+                                              key={
+                                                responsable
+                                              }
+                                              value={
+                                                responsable
+                                              }
+                                            />
+                                          )
+                                        )}
+                                      </datalist>
+                                    </>
+                                  ) : esFecha ? (
+                                    <input
+                                      autoFocus
+                                      type="date"
+                                      value={
+                                        valorEdicion
+                                      }
+                                      onChange={(
+                                        event
+                                      ) =>
+                                        setValorEdicion(
+                                          event
+                                            .target
+                                            .value
+                                        )
+                                      }
+                                      onBlur={() =>
+                                        guardarCelda(
+                                          accion,
+                                          campo,
+                                          valorEdicion
+                                        )
+                                      }
+                                      style={{
+                                        width:
+                                          "100%",
+                                        minHeight:
+                                          "38px",
+                                        border:
+                                          "1px solid #2563eb",
+                                        borderRadius:
+                                          "6px",
+                                        padding:
+                                          "6px",
+                                      }}
+                                    />
+                                  ) : (
+                                    <textarea
+                                      autoFocus
+                                      value={
+                                        valorEdicion
+                                      }
+                                      onChange={(
+                                        event
+                                      ) =>
+                                        setValorEdicion(
+                                          event
+                                            .target
+                                            .value
+                                        )
+                                      }
+                                      onKeyDown={(
+                                        event
+                                      ) =>
+                                        manejarTeclaEdicion(
+                                          event,
+                                          accion,
+                                          campo
+                                        )
+                                      }
+                                      onBlur={() =>
+                                        guardarCelda(
+                                          accion,
+                                          campo,
+                                          valorEdicion
+                                        )
+                                      }
+                                      rows={
+                                        campo ===
+                                          "causa" ||
+                                        campo ===
+                                          "como"
+                                          ? 3
+                                          : 2
+                                      }
+                                      style={{
+                                        width:
+                                          "100%",
+                                        minHeight:
+                                          "48px",
+                                        border:
+                                          "1px solid #2563eb",
+                                        borderRadius:
+                                          "6px",
+                                        padding:
+                                          "6px",
+                                        resize:
+                                          "vertical",
+                                        font:
+                                          "inherit",
+                                      }}
+                                    />
+                                  )
+                                ) : (
+                                  <div
+                                    style={{
+                                      whiteSpace:
+                                        "pre-wrap",
+                                      lineHeight:
+                                        1.45,
+                                    }}
+                                  >
+                                    {campo ===
+                                    "cuando"
+                                      ? formatDate(
+                                          accion[
+                                            campo
+                                          ]
+                                        )
+                                      : accion[
+                                          campo
+                                        ] ||
+                                        "—"}
 
-                      <td
-                        style={{
-                          padding: "14px",
-                          borderBottom: "1px solid #eef2f7",
-                          verticalAlign: "top",
-                          width: "170px",
-                          fontSize: "12px",
-                        }}
-                      >
-                        {accion.quien || "Sin asignar"}
-                      </td>
+                                    {campo ===
+                                      "causa" &&
+                                      accion.origen ===
+                                        "Gemba" && (
+                                        <div
+                                          style={{
+                                            marginTop:
+                                              "6px",
+                                            fontSize:
+                                              "10px",
+                                            color:
+                                              "#667085",
+                                            fontWeight:
+                                              700,
+                                          }}
+                                        >
+                                          Gemba
+                                        </div>
+                                      )}
 
-                      <td
-                        style={{
-                          padding: "14px",
-                          borderBottom: "1px solid #eef2f7",
-                          verticalAlign: "top",
-                          width: "150px",
-                          fontSize: "12px",
-                          color: vencida
-                            ? "#b91c1c"
-                            : "#344054",
-                          fontWeight: vencida
-                            ? 800
-                            : 600,
-                        }}
-                      >
-                        {formatDate(accion.cuando)}
-                      </td>
-
-                      <td
-                        style={{
-                          padding: "12px",
-                          borderBottom: "1px solid #eef2f7",
-                          verticalAlign: "top",
-                          width: "180px",
-                        }}
-                      >
-                        <select
-                          value={accion.estado}
-                          onChange={(event) =>
-                            cambiarEstadoDirecto(
-                              accion.id,
-                              event.target.value
-                            )
+                                    {campo ===
+                                      "causa" &&
+                                      vencida && (
+                                        <div
+                                          style={{
+                                            marginTop:
+                                              "6px",
+                                            color:
+                                              "#b91c1c",
+                                            fontSize:
+                                              "10px",
+                                            fontWeight:
+                                              800,
+                                          }}
+                                        >
+                                          ATRASADA
+                                        </div>
+                                      )}
+                                  </div>
+                                )}
+                              </td>
+                            );
                           }
-                          aria-label={`Cambiar estado de ${accion.causa}`}
-                          title="Cambiar estado"
+                        )}
+
+                        <td
                           style={{
-                            ...getEstiloEstado(accion.estado),
-                            width: "150px",
-                            minHeight: "34px",
-                            borderRadius: "999px",
-                            padding: "6px 28px 6px 12px",
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            outline: "none",
-                            textAlign: "center",
-                            textAlignLast: "center",
+                            padding:
+                              "6px",
+                            border:
+                              "1px solid #e5e7eb",
+                            verticalAlign:
+                              "top",
                           }}
                         >
-                          <option value="Pendiente">
-                            Pendiente
-                          </option>
-
-                          <option value="En proceso">
-                            En proceso
-                          </option>
-
-                          <option value="Terminada">
-                            Terminada
-                          </option>
-                        </select>
-                      </td>
-
-                      <td
-                        style={{
-                          padding: "12px",
-                          borderBottom: "1px solid #eef2f7",
-                          verticalAlign: "top",
-                          width: "90px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "6px",
-                            justifyContent: "flex-end",
-                          }}
-                        >
-                          <button
-                            type="button"
-                            className="secondary-button"
-                            onClick={() => editarAccion(accion)}
-                            title="Editar acción"
+                          <select
+                            value={
+                              accion.estado
+                            }
+                            onChange={(
+                              event
+                            ) =>
+                              guardarCelda(
+                                accion,
+                                "estado",
+                                event
+                                  .target
+                                  .value
+                              )
+                            }
                             style={{
-                              minWidth: "40px",
-                              padding: "9px",
+                              width:
+                                "100%",
+                              minHeight:
+                                "36px",
+                              border:
+                                "1px solid #e5e7eb",
+                              borderRadius:
+                                "6px",
+                              background:
+                                "#fff",
+                              color:
+                                getColorEstado(
+                                  accion.estado
+                                ),
+                              fontWeight:
+                                800,
+                              fontSize:
+                                "12px",
+                              cursor:
+                                "pointer",
                             }}
                           >
-                            <Pencil size={16} />
-                          </button>
+                            {ESTADOS.map(
+                              (
+                                estado
+                              ) => (
+                                <option
+                                  key={
+                                    estado
+                                  }
+                                  value={
+                                    estado
+                                  }
+                                >
+                                  {estado}
+                                </option>
+                              )
+                            )}
+                          </select>
+                        </td>
 
+                        <td
+                          style={{
+                            padding:
+                              "6px",
+                            border:
+                              "1px solid #e5e7eb",
+                            verticalAlign:
+                              "top",
+                            textAlign:
+                              "center",
+                          }}
+                        >
                           <button
                             type="button"
                             className="icon-delete-button"
-                            onClick={() => eliminarAccion(accion)}
+                            onClick={() =>
+                              eliminarAccion(
+                                accion
+                              )
+                            }
                             title="Eliminar acción"
                           >
-                            <Trash2 size={17} />
+                            <Trash2
+                              size={16}
+                            />
                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                      </tr>
+                    );
+                  }
+                )}
               </tbody>
             </table>
           </div>
