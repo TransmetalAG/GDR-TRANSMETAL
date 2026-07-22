@@ -1397,13 +1397,15 @@ function GestionMantenimiento() {
                       style={{
                         ...getEstiloEstado(tarea.estado),
                         borderRadius: "999px",
-                        padding: "6px 30px 6px 12px",
+                        padding: "6px 32px 6px 32px",
                         fontSize: "12px",
                         fontWeight: 700,
                         cursor: "pointer",
                         outline: "none",
-                        width: "auto",
-                        minWidth: "145px",
+                        width: "220px",
+                        maxWidth: "100%",
+                        textAlign: "center",
+                        textAlignLast: "center"                       
                       }}
                     >
                       <option value="Pendiente de asignación">
