@@ -1396,16 +1396,15 @@ function GestionMantenimiento() {
                       title="Cambiar estado"
                       style={{
                         ...getEstiloEstado(tarea.estado),
-                        borderRadius: "999px",
-                        padding: "6px 32px 6px 32px",
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        outline: "none",
-                        width: "220px",
-                        maxWidth: "100%",
-                        textAlign: "center",
-                        textAlignLast: "center"                       
+                           borderRadius: "999px",
+                            padding: "5px 26px 5px 12px",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            outline: "none",
+                           width: "175px",
+                           textAlign: "center",
+                           textAlignLast: "center",                   
                       }}
                     >
                       <option value="Pendiente de asignación">
