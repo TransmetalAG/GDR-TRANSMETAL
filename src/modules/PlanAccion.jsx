@@ -1,2209 +1,1842 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
+  LayoutDashboard,
+  Footprints,
   ClipboardList,
-  Plus,
-  Search,
-  Filter,
-  AlertTriangle,
-  CheckCircle2,
-  Clock3,
-  CalendarDays,
+  Wrench,
+  ListTodo,
+  ShieldCheck,
+  Award,
+  Gauge,
+  ArrowLeft,
+  ArrowRight,
   User,
   Factory,
+  Hammer,
+  CalendarDays,
+  CheckCircle2,
   Workflow,
-  Pencil,
-  Trash2,
-  X,
-  ChevronDown,
+  LogOut,
+  LogIn,
 } from "lucide-react";
 
-import { catalogo } from "../data/CatalogoMaquinas.js";
-import { colaboradores } from "../data/CatalogoColaboradores.js";
-import { supabase } from "../lib/supabase.js";
+import { catalogo } from "./data/CatalogoMaquinas.js";
+import { colaboradores } from "./data/CatalogoColaboradores.js";
+import { usuarios } from "./data/CatalogoUsuarios.js";
 
-const ESTADOS = [
-  "Pendiente",
-  "En proceso",
-  "Terminada",
-];
+import Seguridad from "./modules/Seguridad.jsx";
+import Calidad from "./modules/Calidad.jsx";
+import Proceso from "./modules/Proceso.jsx";
+import Mantenimiento from "./modules/Mantenimiento.jsx";
+import GestionMantenimiento from "./modules/GestionMantenimiento.jsx";
+import PlanAccion from "./modules/PlanAccion.jsx";
 
-const PILARES = [
-  "Seguridad",
-  "Calidad",
-  "Proceso / Productividad",
-  "Otro",
-];
+import ResumenGemba from "./components/ResumenGemba.jsx";
+import { supabase } from "./lib/supabase.js";
 
-const PRIORIDADES = [
-  "Baja",
-  "Media",
-  "Alta",
-  "Crítica",
-];
-
-function toDateString(date) {
-  const year = date.getFullYear();
-  const month = String(
-    date.getMonth() + 1
-  ).padStart(2, "0");
-  const day = String(
-    date.getDate()
-  ).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function formatDate(dateString) {
-  if (!dateString) {
-    return "Sin fecha";
-  }
-
-  return new Intl.DateTimeFormat(
-    "es-GT",
-    {
-      dateStyle: "medium",
+function App() {
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem("gdr_user");
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
     }
-  ).format(
-    new Date(
-      `${dateString}T12:00:00`
-    )
-  );
-}
+  });
 
-function normalizarAccion(row) {
-  return {
-    id: row.id,
-    gembaId: row.gemba_id || null,
-    origen: row.origen || "Manual",
+  const [currentPage, setCurrentPage] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem("gdr_user");
+      const parsedUser = savedUser ? JSON.parse(savedUser) : null;
 
-    pilar: row.pilar || "",
-    maquina: row.maquina || "",
-    proceso: row.proceso || "",
-    auditor: row.auditor || "",
-    colaborador: row.colaborador || "",
+      return parsedUser?.rol === "Mantenimiento"
+        ? "mantenimiento"
+        : "dashboard";
+    } catch {
+      return "dashboard";
+    }
+  });
 
-    hallazgo: row.hallazgo || "",
-    prioridad: row.prioridad || "Media",
+  const [gembaStarted, setGembaStarted] = useState(false);
 
-    que: row.que || "",
-    porQue: row.por_que || "",
-    responsable: row.responsable || "",
-    fechaCompromiso:
-      row.fecha_compromiso || "",
-    como: row.como || "",
-    costoEstimado:
-      row.costo_estimado !== null &&
-      row.costo_estimado !== undefined
-        ? Number(row.costo_estimado)
-        : "",
+  const [activeGembaModule, setActiveGembaModule] =
+    useState(null);
 
-    estado: row.estado || "Pendiente",
-    observaciones:
-      row.observaciones || "",
-    evidencia: row.evidencia || "",
-    fechaCierre: row.fecha_cierre || null,
+  const [showGembaSummary, setShowGembaSummary] =
+    useState(false);
 
-    createdAt: row.created_at || null,
-  };
-}
+  const [gembaData, setGembaData] = useState({
+    maquina: "",
+    proceso: "",
+    collaborator: "",
+    task: "",
+    auditor: currentUser?.rol === "Mantenimiento" ? "" : currentUser?.nombre || "",
+  });
 
-function PlanAccion() {
-  const [loading, setLoading] =
-    useState(true);
+  const [moduleResults, setModuleResults] = useState({
+    seguridad: null,
+    calidad: null,
+    proceso: null,
+    mantenimiento: null,
+  });
 
-  const [
-    guardando,
-    setGuardando,
-  ] = useState(false);
+  const baseModules = [
+    {
+      id: "seguridad",
+      name: "Seguridad",
+      description:
+        "Condiciones físicas, comportamiento y procedimientos",
+      icon: ShieldCheck,
+    },
+    {
+      id: "calidad",
+      name: "Calidad",
+      description:
+        "Condición del producto y controles del proceso",
+      icon: Award,
+    },
+    {
+      id: "proceso",
+      name: "Proceso / Productividad",
+      description:
+        "Desperdicios Lean y oportunidades de mejora",
+      icon: Gauge,
+    },
+    {
+      id: "mantenimiento",
+      name: "Mantenimiento",
+      description:
+        "Detección y seguimiento de anomalías del equipo",
+      icon: Wrench,
+    },
+  ];
 
-  const [
-    mostrarFormulario,
-    setMostrarFormulario,
-  ] = useState(false);
+  const modules = baseModules.map((module) => ({
+    ...module,
+    status: moduleResults[module.id]
+      ? "Completado"
+      : "Pendiente",
+  }));
 
-  const [
-    modoEdicion,
-    setModoEdicion,
-  ] = useState(null);
-
-  const [
-    estadoAbiertoId,
-    setEstadoAbiertoId,
-  ] = useState(null);
-
-  const [acciones, setAcciones] =
-    useState([]);
-
-  const [filtros, setFiltros] =
-    useState({
-      busqueda: "",
-      pilar: "",
-      responsable: "",
-      estado: "",
-      prioridad: "",
-      maquina: "",
-      origen: "",
-    });
-
-  const [nuevaAccion, setNuevaAccion] =
-    useState({
-      origen: "Manual",
-
-      pilar: "",
-      maquina: "",
-      proceso: "",
-      auditor: "",
-      colaborador: "",
-
-      hallazgo: "",
-      prioridad: "Media",
-
-      que: "",
-      porQue: "",
-      responsable: "",
-      fechaCompromiso: "",
-      como: "",
-      costoEstimado: "",
-
-      estado: "Pendiente",
-      observaciones: "",
-      evidencia: "",
-    });
+  const navigation =
+    currentUser?.rol === "Mantenimiento"
+      ? [
+          {
+            id: "mantenimiento",
+            label: "Mantenimiento",
+            icon: Wrench,
+          },
+        ]
+      : [
+          {
+            id: "dashboard",
+            label: "Dashboard",
+            icon: LayoutDashboard,
+          },
+          {
+            id: "nuevo-gemba",
+            label: "Nuevo Gemba",
+            icon: Footprints,
+          },
+          {
+            id: "plan-accion",
+            label: "Plan de Acción",
+            icon: ClipboardList,
+          },
+          {
+            id: "mantenimiento",
+            label: "Mantenimiento",
+            icon: Wrench,
+          },
+          {
+            id: "mis-tareas",
+            label: "Mis tareas",
+            icon: ListTodo,
+          },
+        ];
 
   const maquinas = useMemo(() => {
     return [
       ...new Set(
-        catalogo.map(
-          (item) => item.maquina
-        )
+        catalogo.map((item) => item.maquina)
       ),
-    ].sort((a, b) =>
+    ].sort();
+  }, []);
+
+  const procesosDisponibles = useMemo(() => {
+    if (!gembaData.maquina) return [];
+
+    return catalogo
+      .filter(
+        (item) =>
+          item.maquina === gembaData.maquina
+      )
+      .map((item) => item.proceso);
+  }, [gembaData.maquina]);
+
+  const colaboradoresOrdenados = useMemo(() => {
+    return [...colaboradores].sort((a, b) =>
       a.localeCompare(b, "es")
     );
   }, []);
 
-  const procesosDisponibles =
-    useMemo(() => {
-      if (!nuevaAccion.maquina) {
-        return [];
-      }
-
-      return [
-        ...new Set(
-          catalogo
-            .filter(
-              (item) =>
-                item.maquina ===
-                nuevaAccion.maquina
-            )
-            .map(
-              (item) => item.proceso
-            )
-        ),
-      ].sort((a, b) =>
-        a.localeCompare(b, "es")
-      );
-    }, [nuevaAccion.maquina]);
-
-  const responsables = useMemo(() => {
-    const existentes = acciones
-      .map(
-        (accion) =>
-          accion.responsable
-      )
-      .filter(Boolean);
-
-    return [
-      ...new Set([
-        ...colaboradores,
-        ...existentes,
-      ]),
-    ].sort((a, b) =>
-      a.localeCompare(b, "es")
-    );
-  }, [acciones]);
-
-  useEffect(() => {
-    cargarAcciones();
-  }, []);
-
-  async function cargarAcciones() {
-    setLoading(true);
-
-    const { data, error } =
-      await supabase
-        .from("plan_accion")
-        .select("*")
-        .order(
-          "created_at",
-          {
-            ascending: false,
-          }
-        );
-
-    if (error) {
-      console.error(
-        "Error al cargar plan de acción:",
-        error
-      );
-
-      alert(
-        `No se pudo cargar el Plan de Acción.\n\n${error.message}`
-      );
-
-      setLoading(false);
-      return;
+  const currentDate = new Intl.DateTimeFormat(
+    "es-GT",
+    {
+      dateStyle: "long",
+      timeStyle: "short",
     }
+  ).format(new Date());
 
-    setAcciones(
-      (data || []).map(
-        normalizarAccion
-      )
-    );
+  const completedModules =
+    Object.values(moduleResults).filter(Boolean).length;
 
-    setLoading(false);
-  }
+  const allModulesCompleted =
+    completedModules === baseModules.length;
 
-  function estaVencida(accion) {
-    if (
-      accion.estado ===
-      "Terminada"
-    ) {
-      return false;
-    }
-
-    if (
-      !accion.fechaCompromiso
-    ) {
-      return false;
-    }
-
-    const hoy = toDateString(
-      new Date()
-    );
-
-    return (
-      accion.fechaCompromiso <
-      hoy
-    );
-  }
-
-  const indicadores = useMemo(() => {
+  function getEmptyModuleResults() {
     return {
-      pendientes:
-        acciones.filter(
-          (accion) =>
-            accion.estado ===
-            "Pendiente"
-        ).length,
-
-      enProceso:
-        acciones.filter(
-          (accion) =>
-            accion.estado ===
-            "En proceso"
-        ).length,
-
-      terminadas:
-        acciones.filter(
-          (accion) =>
-            accion.estado ===
-            "Terminada"
-        ).length,
-
-      vencidas:
-        acciones.filter(
-          estaVencida
-        ).length,
+      seguridad: null,
+      calidad: null,
+      proceso: null,
+      mantenimiento: null,
     };
-  }, [acciones]);
+  }
 
-  const accionesFiltradas =
-    useMemo(() => {
-      const texto =
-        filtros.busqueda
-          .trim()
-          .toLowerCase();
-
-      return acciones.filter(
-        (accion) => {
-          const coincideBusqueda =
-            !texto ||
-            accion.hallazgo
-              .toLowerCase()
-              .includes(texto) ||
-            accion.que
-              .toLowerCase()
-              .includes(texto) ||
-            accion.maquina
-              .toLowerCase()
-              .includes(texto) ||
-            accion.proceso
-              .toLowerCase()
-              .includes(texto) ||
-            accion.responsable
-              .toLowerCase()
-              .includes(texto);
-
-          const coincidePilar =
-            !filtros.pilar ||
-            accion.pilar ===
-              filtros.pilar;
-
-          const coincideResponsable =
-            !filtros.responsable ||
-            accion.responsable ===
-              filtros.responsable;
-
-          const coincideEstado =
-            !filtros.estado ||
-            accion.estado ===
-              filtros.estado;
-
-          const coincidePrioridad =
-            !filtros.prioridad ||
-            accion.prioridad ===
-              filtros.prioridad;
-
-          const coincideMaquina =
-            !filtros.maquina ||
-            accion.maquina ===
-              filtros.maquina;
-
-          const coincideOrigen =
-            !filtros.origen ||
-            accion.origen ===
-              filtros.origen;
-
-          return (
-            coincideBusqueda &&
-            coincidePilar &&
-            coincideResponsable &&
-            coincideEstado &&
-            coincidePrioridad &&
-            coincideMaquina &&
-            coincideOrigen
-          );
-        }
-      );
-    }, [acciones, filtros]);
-
-  function limpiarFormulario() {
-    setNuevaAccion({
-      origen: "Manual",
-
-      pilar: "",
+  function getEmptyGembaData() {
+    return {
       maquina: "",
       proceso: "",
-      auditor: "",
-      colaborador: "",
-
-      hallazgo: "",
-      prioridad: "Media",
-
-      que: "",
-      porQue: "",
-      responsable: "",
-      fechaCompromiso: "",
-      como: "",
-      costoEstimado: "",
-
-      estado: "Pendiente",
-      observaciones: "",
-      evidencia: "",
-    });
-
-    setModoEdicion(null);
-  }
-
-  function abrirNuevaAccion() {
-    limpiarFormulario();
-
-    setMostrarFormulario(
-      true
-    );
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  }
-
-  function editarAccion(accion) {
-    setModoEdicion(
-      accion.id
-    );
-
-    setNuevaAccion({
-      origen:
-        accion.origen ||
-        "Manual",
-
-      pilar:
-        accion.pilar || "",
-      maquina:
-        accion.maquina || "",
-      proceso:
-        accion.proceso || "",
+      collaborator: "",
+      task: "",
       auditor:
-        accion.auditor || "",
-      colaborador:
-        accion.colaborador || "",
-
-      hallazgo:
-        accion.hallazgo || "",
-      prioridad:
-        accion.prioridad ||
-        "Media",
-
-      que:
-        accion.que || "",
-      porQue:
-        accion.porQue || "",
-      responsable:
-        accion.responsable || "",
-      fechaCompromiso:
-        accion.fechaCompromiso ||
-        "",
-      como:
-        accion.como || "",
-      costoEstimado:
-        accion.costoEstimado ===
-        ""
+        currentUser?.rol === "Mantenimiento"
           ? ""
-          : String(
-              accion.costoEstimado
-            ),
+          : currentUser?.nombre || "",
+    };
+  }
 
-      estado:
-        accion.estado ||
-        "Pendiente",
-      observaciones:
-        accion.observaciones ||
-        "",
-      evidencia:
-        accion.evidencia || "",
+  function handleLogin(user) {
+    setCurrentUser(user);
+    localStorage.setItem("gdr_user", JSON.stringify(user));
+
+    setGembaData({
+      maquina: "",
+      proceso: "",
+      collaborator: "",
+      task: "",
+      auditor: user.rol === "Mantenimiento" ? "" : user.nombre,
     });
 
-    setMostrarFormulario(
-      true
+    setCurrentPage(
+      user.rol === "Mantenimiento"
+        ? "mantenimiento"
+        : "dashboard"
     );
+  }
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
+  function handleLogout() {
+    if (gembaStarted) {
+      const confirmLogout = window.confirm(
+        "Tenés un Gemba en curso. Si cerrás sesión, los datos no guardados se perderán. ¿Deseás continuar?"
+      );
+
+      if (!confirmLogout) return;
+    }
+
+    localStorage.removeItem("gdr_user");
+    setCurrentUser(null);
+    setCurrentPage("dashboard");
+    setGembaStarted(false);
+    setActiveGembaModule(null);
+    setShowGembaSummary(false);
+    setModuleResults(getEmptyModuleResults());
+    setGembaData({
+      maquina: "",
+      proceso: "",
+      collaborator: "",
+      task: "",
+      auditor: "",
     });
   }
 
-  function handleAccionChange(
-    event
-  ) {
-    const {
-      name,
-      value,
-    } = event.target;
+  function handleInputChange(event) {
+    const { name, value } = event.target;
 
     if (name === "maquina") {
       const procesos = catalogo
         .filter(
-          (item) =>
-            item.maquina ===
-            value
+          (item) => item.maquina === value
         )
-        .map(
-          (item) => item.proceso
-        );
+        .map((item) => item.proceso);
 
-      setNuevaAccion(
-        (previous) => ({
-          ...previous,
-          maquina: value,
-          proceso:
-            procesos.length ===
-            1
-              ? procesos[0]
-              : "",
-        })
-      );
+      setGembaData((previous) => ({
+        ...previous,
+        maquina: value,
+        proceso:
+          procesos.length === 1
+            ? procesos[0]
+            : "",
+      }));
 
       return;
     }
 
-    setNuevaAccion(
-      (previous) => ({
-        ...previous,
-        [name]: value,
-      })
-    );
+    setGembaData((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
   }
 
-  function handleFiltroChange(
-    event
-  ) {
-    const {
-      name,
-      value,
-    } = event.target;
-
-    setFiltros(
-      (previous) => ({
-        ...previous,
-        [name]: value,
-      })
-    );
-  }
-
-  async function guardarAccion(
-    event
-  ) {
+  function handleStartGemba(event) {
     event.preventDefault();
 
     if (
-      !nuevaAccion.hallazgo.trim()
+      !gembaData.maquina ||
+      !gembaData.proceso ||
+      !gembaData.collaborator ||
+      !gembaData.task.trim() ||
+      !gembaData.auditor
     ) {
       alert(
-        "Describí el hallazgo o situación."
+        "Completá todos los datos antes de iniciar el Gemba."
       );
       return;
     }
 
-    if (!nuevaAccion.pilar) {
-      alert(
-        "Seleccioná el pilar o categoría."
-      );
-      return;
-    }
-
-    if (
-      !nuevaAccion.que.trim()
-    ) {
-      alert(
-        "Indicá qué acción se realizará."
-      );
-      return;
-    }
-
-    if (
-      !nuevaAccion.responsable.trim()
-    ) {
-      alert(
-        "Indicá el responsable de la acción."
-      );
-      return;
-    }
-
-    if (
-      !nuevaAccion.fechaCompromiso
-    ) {
-      alert(
-        "Seleccioná una fecha compromiso."
-      );
-      return;
-    }
-
-    const costo =
-      nuevaAccion.costoEstimado ===
-      ""
-        ? null
-        : Number(
-            nuevaAccion.costoEstimado
-          );
-
-    if (
-      costo !== null &&
-      (!Number.isFinite(costo) ||
-        costo < 0)
-    ) {
-      alert(
-        "Ingresá un costo estimado válido."
-      );
-      return;
-    }
-
-    setGuardando(true);
-
-    const payload = {
-      origen:
-        nuevaAccion.origen ||
-        "Manual",
-
-      pilar:
-        nuevaAccion.pilar,
-
-      maquina:
-        nuevaAccion.maquina ||
-        null,
-
-      proceso:
-        nuevaAccion.proceso ||
-        null,
-
-      auditor:
-        nuevaAccion.auditor ||
-        null,
-
-      colaborador:
-        nuevaAccion.colaborador ||
-        null,
-
-      hallazgo:
-        nuevaAccion.hallazgo.trim(),
-
-      prioridad:
-        nuevaAccion.prioridad,
-
-      que:
-        nuevaAccion.que.trim(),
-
-      por_que:
-        nuevaAccion.porQue.trim() ||
-        null,
-
-      responsable:
-        nuevaAccion.responsable.trim(),
-
-      fecha_compromiso:
-        nuevaAccion.fechaCompromiso,
-
-      como:
-        nuevaAccion.como.trim() ||
-        null,
-
-      costo_estimado: costo,
-
-      estado:
-        nuevaAccion.estado,
-
-      observaciones:
-        nuevaAccion.observaciones.trim() ||
-        null,
-
-      evidencia:
-        nuevaAccion.evidencia.trim() ||
-        null,
-
-      fecha_cierre:
-        nuevaAccion.estado ===
-        "Terminada"
-          ? new Date().toISOString()
-          : null,
-    };
-
-    let error;
-
-    if (modoEdicion) {
-      const response =
-        await supabase
-          .from("plan_accion")
-          .update(payload)
-          .eq(
-            "id",
-            modoEdicion
-          );
-
-      error = response.error;
-    } else {
-      const response =
-        await supabase
-          .from("plan_accion")
-          .insert(payload);
-
-      error = response.error;
-    }
-
-    if (error) {
-      console.error(
-        "Error al guardar acción:",
-        error
-      );
-
-      alert(
-        `No se pudo guardar la acción.\n\n${error.message}`
-      );
-
-      setGuardando(false);
-      return;
-    }
-
-    limpiarFormulario();
-
-    setMostrarFormulario(
-      false
-    );
-
-    setGuardando(false);
-
-    await cargarAcciones();
+    setGembaStarted(true);
+    setActiveGembaModule(null);
+    setShowGembaSummary(false);
   }
 
-  async function eliminarAccion(
-    accion
-  ) {
-    const confirmar =
-      window.confirm(
-        `¿Seguro que deseás eliminar esta acción?\n\n${accion.hallazgo}\n\nEsta acción no se puede deshacer.`
-      );
-
-    if (!confirmar) {
+  function handleNewGemba() {
+    if (currentUser?.rol === "Mantenimiento") {
+      setCurrentPage("mantenimiento");
       return;
     }
 
-    const { error } =
+    setCurrentPage("nuevo-gemba");
+
+    setGembaStarted(false);
+
+    setActiveGembaModule(null);
+
+    setShowGembaSummary(false);
+
+    setGembaData(getEmptyGembaData());
+
+    setModuleResults(
+      getEmptyModuleResults()
+    );
+  }
+
+  function handleCancelGemba() {
+    const confirmExit = window.confirm(
+      "¿Seguro que querés salir del Gemba? Los datos registrados en este recorrido se perderán."
+    );
+
+    if (!confirmExit) {
+      return;
+    }
+
+    setGembaStarted(false);
+
+    setActiveGembaModule(null);
+
+    setShowGembaSummary(false);
+
+    setGembaData(getEmptyGembaData());
+
+    setModuleResults(
+      getEmptyModuleResults()
+    );
+
+    setCurrentPage("dashboard");
+  }
+
+  function handleOpenModule(moduleId) {
+    if (
+      moduleId === "seguridad" ||
+      moduleId === "calidad" ||
+      moduleId === "proceso" ||
+      moduleId === "mantenimiento"
+    ) {
+      setShowGembaSummary(false);
+
+      setActiveGembaModule(moduleId);
+    }
+  }
+
+  function handleCompleteSafety(result) {
+    setModuleResults((previous) => ({
+      ...previous,
+      seguridad: result,
+    }));
+
+    setActiveGembaModule(null);
+  }
+
+  function handleCompleteQuality(result) {
+    setModuleResults((previous) => ({
+      ...previous,
+      calidad: result,
+    }));
+
+    setActiveGembaModule(null);
+  }
+
+  function handleCompleteProcess(result) {
+    setModuleResults((previous) => ({
+      ...previous,
+      proceso: result,
+    }));
+
+    setActiveGembaModule(null);
+  }
+
+  function handleCompleteMaintenance(result) {
+    setModuleResults((previous) => ({
+      ...previous,
+      mantenimiento: result,
+    }));
+
+    setActiveGembaModule(null);
+  }
+
+  function handleOpenSummary() {
+    if (!allModulesCompleted) {
+      alert(
+        "Completá los cuatro módulos antes de finalizar el Gemba."
+      );
+
+      return;
+    }
+
+    setActiveGembaModule(null);
+
+    setShowGembaSummary(true);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  function handleBackFromSummary() {
+    setShowGembaSummary(false);
+
+    setActiveGembaModule(null);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  async function handleConfirmGemba() {
+    /*
+      Al finalizar el Gemba:
+      1. Guardamos el Gemba y recuperamos su ID.
+      2. Los hallazgos del pilar Mantenimiento se envían a Gestión de Mantenimiento.
+      3. Los hallazgos de Seguridad, Calidad y Proceso/Productividad
+         se envían automáticamente al Plan de Acción.
+    */
+
+    const { data: gembaGuardado, error: gembaError } =
       await supabase
-        .from("plan_accion")
-        .delete()
-        .eq("id", accion.id);
+        .from("gembas")
+        .insert({
+          fecha: new Date().toISOString(),
+          maquina: gembaData.maquina,
+          proceso: gembaData.proceso,
+          colaborador: gembaData.collaborator,
+          tarea: gembaData.task,
+          auditor: gembaData.auditor,
+          estado: "Finalizado",
+          seguridad: moduleResults.seguridad,
+          calidad: moduleResults.calidad,
+          proceso_resultado: moduleResults.proceso,
+          mantenimiento: moduleResults.mantenimiento,
+        })
+        .select("id")
+        .single();
 
-    if (error) {
+    if (gembaError) {
       console.error(
-        "Error al eliminar acción:",
-        error
+        "Error al guardar el Gemba:",
+        gembaError
       );
 
       alert(
-        `No se pudo eliminar la acción.\n\n${error.message}`
+        `No se pudo guardar el Gemba. No se perdió la información.\n\n${gembaError.message}`
       );
 
       return;
     }
 
-    setAcciones(
-      (previous) =>
-        previous.filter(
-          (item) =>
-            item.id !== accion.id
-        )
+    /*
+      ============================
+      1. Gemba → Mantenimiento
+      ============================
+    */
+
+    const hallazgosMantenimiento =
+      moduleResults.mantenimiento?.hallazgos || [];
+
+    if (hallazgosMantenimiento.length > 0) {
+      const tareasMantenimiento =
+        hallazgosMantenimiento.map((hallazgo) => ({
+          tipo_registro: "tarea",
+          equipo: gembaData.maquina,
+          tarea: hallazgo.descripcion,
+          responsable: null,
+          dia_programado: null,
+          tiempo_estimado_horas: null,
+          prioridad: hallazgo.prioridad || "Media",
+          estado: "Pendiente de asignación",
+          origen: "Gemba",
+          gemba_id: gembaGuardado.id,
+          observaciones:
+            `Generada automáticamente desde Gemba. ` +
+            `Proceso: ${gembaData.proceso}. ` +
+            `Tarea observada: ${gembaData.task}. ` +
+            `Auditor: ${gembaData.auditor}.`,
+          fecha_cierre: null,
+        }));
+
+      const { error: mantenimientoError } =
+        await supabase
+          .from("mantenimiento")
+          .insert(tareasMantenimiento);
+
+      if (mantenimientoError) {
+        console.error(
+          "El Gemba se guardó, pero hubo un error al crear las tareas de mantenimiento:",
+          mantenimientoError
+        );
+
+        alert(
+          `El Gemba sí quedó guardado, pero no se pudieron crear automáticamente las tareas de mantenimiento.\n\n${mantenimientoError.message}`
+        );
+
+        return;
+      }
+    }
+
+    /*
+      ============================
+      2. Gemba → Plan de Acción
+      ============================
+
+      Solo enviamos hallazgos de:
+      - Seguridad
+      - Calidad
+      - Proceso / Productividad
+
+      El pilar Mantenimiento NO entra al Plan de Acción.
+    */
+
+    const accionesPlan = [];
+
+    // SEGURIDAD · Condiciones físicas
+    const hallazgosCondiciones =
+      moduleResults.seguridad?.condiciones?.hallazgos || [];
+
+    hallazgosCondiciones.forEach((hallazgo) => {
+      accionesPlan.push({
+        gemba_id: gembaGuardado.id,
+        origen: "Gemba",
+        pilar: "Seguridad",
+        maquina: gembaData.maquina,
+        proceso: gembaData.proceso,
+        auditor: gembaData.auditor,
+        colaborador: gembaData.collaborator,
+        hallazgo: hallazgo.descripcion,
+        prioridad: hallazgo.criticidad || "Media",
+        estado: "Pendiente",
+        observaciones: "Hallazgo de Seguridad · Condiciones físicas",
+      });
+    });
+
+    // SEGURIDAD · Comportamiento
+    const hallazgosComportamiento =
+      moduleResults.seguridad?.comportamiento?.hallazgos || [];
+
+    hallazgosComportamiento.forEach((hallazgo) => {
+      accionesPlan.push({
+        gemba_id: gembaGuardado.id,
+        origen: "Gemba",
+        pilar: "Seguridad",
+        maquina: gembaData.maquina,
+        proceso: gembaData.proceso,
+        auditor: gembaData.auditor,
+        colaborador: gembaData.collaborator,
+        hallazgo: hallazgo.descripcion,
+        prioridad: hallazgo.criticidad || "Media",
+        estado: "Pendiente",
+        observaciones: "Hallazgo de Seguridad · Comportamiento",
+      });
+    });
+
+    // CALIDAD · Condición del producto
+    const hallazgosProducto =
+      moduleResults.calidad?.producto?.hallazgos || [];
+
+    hallazgosProducto.forEach((hallazgo) => {
+      accionesPlan.push({
+        gemba_id: gembaGuardado.id,
+        origen: "Gemba",
+        pilar: "Calidad",
+        maquina: gembaData.maquina,
+        proceso: gembaData.proceso,
+        auditor: gembaData.auditor,
+        colaborador: gembaData.collaborator,
+        hallazgo: hallazgo.descripcion,
+        prioridad: hallazgo.criticidad || "Media",
+        estado: "Pendiente",
+        observaciones: "Hallazgo de Calidad · Condición del producto",
+      });
+    });
+
+    // CALIDAD · Control del proceso
+    const hallazgosControl =
+      moduleResults.calidad?.controlProceso?.hallazgos || [];
+
+    hallazgosControl.forEach((hallazgo) => {
+      const descripcionControl =
+        hallazgo.descripcion?.trim()
+          ? `${hallazgo.tipo}: ${hallazgo.descripcion.trim()}`
+          : hallazgo.tipo;
+
+      accionesPlan.push({
+        gemba_id: gembaGuardado.id,
+        origen: "Gemba",
+        pilar: "Calidad",
+        maquina: gembaData.maquina,
+        proceso: gembaData.proceso,
+        auditor: gembaData.auditor,
+        colaborador: gembaData.collaborator,
+        hallazgo: descripcionControl,
+        prioridad: hallazgo.criticidad || "Media",
+        estado: "Pendiente",
+        observaciones: "Hallazgo de Calidad · Control del proceso",
+      });
+    });
+
+    // PROCESO / PRODUCTIVIDAD
+    const hallazgosProceso =
+      moduleResults.proceso?.hallazgos || [];
+
+    hallazgosProceso.forEach((hallazgo) => {
+      const prioridadProceso =
+        hallazgo.impacto === "Alto"
+          ? "Alta"
+          : hallazgo.impacto === "Bajo"
+            ? "Baja"
+            : "Media";
+
+      const descripcionProceso =
+        hallazgo.tipo
+          ? `${hallazgo.tipo}: ${hallazgo.descripcion}`
+          : hallazgo.descripcion;
+
+      accionesPlan.push({
+        gemba_id: gembaGuardado.id,
+        origen: "Gemba",
+        pilar: "Proceso / Productividad",
+        maquina: gembaData.maquina,
+        proceso: gembaData.proceso,
+        auditor: gembaData.auditor,
+        colaborador: gembaData.collaborator,
+        hallazgo: descripcionProceso,
+        prioridad: prioridadProceso,
+        estado: "Pendiente",
+        observaciones: hallazgo.perdidaEstimada
+          ? `Pérdida estimada registrada en Gemba: ${hallazgo.perdidaEstimada}`
+          : "Hallazgo de Proceso / Productividad",
+      });
+    });
+
+    if (accionesPlan.length > 0) {
+      const { error: planError } =
+        await supabase
+          .from("plan_accion")
+          .insert(accionesPlan);
+
+      if (planError) {
+        console.error(
+          "El Gemba se guardó, pero hubo un error al crear las acciones:",
+          planError
+        );
+
+        alert(
+          `El Gemba sí quedó guardado, pero no se pudieron enviar automáticamente los hallazgos al Plan de Acción.\n\n${planError.message}`
+        );
+
+        return;
+      }
+    }
+
+    /*
+      ============================
+      3. Confirmación final
+      ============================
+    */
+
+    const mensajes = [
+      "Gemba guardado y finalizado correctamente.",
+    ];
+
+    if (accionesPlan.length > 0) {
+      mensajes.push(
+        `Se enviaron ${accionesPlan.length} ${
+          accionesPlan.length === 1
+            ? "hallazgo"
+            : "hallazgos"
+        } al Plan de Acción.`
+      );
+    }
+
+    if (hallazgosMantenimiento.length > 0) {
+      mensajes.push(
+        `Se enviaron ${hallazgosMantenimiento.length} ${
+          hallazgosMantenimiento.length === 1
+            ? "tarea"
+            : "tareas"
+        } a Gestión de Mantenimiento.`
+      );
+    }
+
+    alert(mensajes.join("\n\n"));
+
+    setGembaStarted(false);
+    setActiveGembaModule(null);
+    setShowGembaSummary(false);
+    setGembaData(getEmptyGembaData());
+    setModuleResults(
+      getEmptyModuleResults()
     );
+    setCurrentPage("dashboard");
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  function handleNavigation(itemId) {
+    /*
+      Mientras existe un Gemba en curso,
+      evitamos perderlo accidentalmente.
+    */
 
     if (
-      modoEdicion ===
-      accion.id
+      currentPage === "nuevo-gemba" &&
+      gembaStarted &&
+      itemId !== "nuevo-gemba"
     ) {
-      limpiarFormulario();
-
-      setMostrarFormulario(
-        false
+      const confirmExit = window.confirm(
+        "Tenés un Gemba en curso. Si salís ahora, los datos registrados se perderán. ¿Deseás continuar?"
       );
+
+      if (!confirmExit) {
+        return;
+      }
+
+      setGembaStarted(false);
+
+      setActiveGembaModule(null);
+
+      setShowGembaSummary(false);
+
+      setGembaData(getEmptyGembaData());
+
+      setModuleResults(
+        getEmptyModuleResults()
+      );
+    }
+
+    setCurrentPage(itemId);
+
+    if (itemId === "nuevo-gemba") {
+      setActiveGembaModule(null);
+
+      setShowGembaSummary(false);
     }
   }
 
-  async function cambiarEstadoDirecto(
-    accionId,
-    nuevoEstado
-  ) {
-    const accionAnterior =
-      acciones.find(
-        (item) =>
-          item.id === accionId
-      );
+  if (!currentUser) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
 
-    if (!accionAnterior) {
-      return;
-    }
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-icon">
+            <Footprints size={24} />
+          </div>
 
-    setAcciones(
-      (previous) =>
-        previous.map(
-          (item) =>
-            item.id === accionId
-              ? {
-                  ...item,
-                  estado:
-                    nuevoEstado,
-                  fechaCierre:
-                    nuevoEstado ===
-                    "Terminada"
-                      ? new Date().toISOString()
-                      : null,
+          <div>
+            <h1>GDR Gemba</h1>
+
+            <span>
+              Gestión de Rutina
+            </span>
+          </div>
+        </div>
+
+        <nav className="navigation">
+          {navigation.map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <button
+                key={item.id}
+                className={
+                  currentPage === item.id
+                    ? "nav-button active"
+                    : "nav-button"
                 }
-              : item
-        )
+                onClick={() =>
+                  handleNavigation(item.id)
+                }
+              >
+                <Icon size={20} />
+
+                <span>
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="sidebar-user">
+          <div className="avatar">
+            {getInitials(currentUser.nombre)}
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <strong>
+              {currentUser.nombre}
+            </strong>
+
+            <span>
+              {currentUser.rol}
+            </span>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                marginTop: "9px",
+                padding: 0,
+                border: 0,
+                background: "transparent",
+                color: "#9ca3af",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "11px",
+                fontWeight: 700,
+              }}
+            >
+              <LogOut size={13} />
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <main className="main-content">
+        {currentPage === "dashboard" && (
+          <Dashboard
+            modules={modules}
+            onNewGemba={handleNewGemba}
+          />
+        )}
+
+        {currentPage === "nuevo-gemba" &&
+          !gembaStarted &&
+          !activeGembaModule &&
+          !showGembaSummary && (
+            <NewGembaForm
+              gembaData={gembaData}
+              maquinas={maquinas}
+              procesosDisponibles={
+                procesosDisponibles
+              }
+              colaboradores={
+                colaboradoresOrdenados
+              }
+              currentDate={currentDate}
+              onChange={handleInputChange}
+              onSubmit={handleStartGemba}
+              onCancel={() =>
+                setCurrentPage("dashboard")
+              }
+            />
+          )}
+
+        {currentPage === "nuevo-gemba" &&
+          gembaStarted &&
+          !activeGembaModule &&
+          !showGembaSummary && (
+            <GembaModules
+              gembaData={gembaData}
+              modules={modules}
+              currentDate={currentDate}
+              completedModules={
+                completedModules
+              }
+              allModulesCompleted={
+                allModulesCompleted
+              }
+              onBack={() =>
+                setGembaStarted(false)
+              }
+              onCancel={
+                handleCancelGemba
+              }
+              onOpenModule={
+                handleOpenModule
+              }
+              onFinish={
+                handleOpenSummary
+              }
+            />
+          )}
+
+        {currentPage === "nuevo-gemba" &&
+          gembaStarted &&
+          activeGembaModule ===
+            "seguridad" &&
+          !showGembaSummary && (
+            <Seguridad
+              gembaData={gembaData}
+              initialData={moduleResults.seguridad}
+              onBack={() =>
+                setActiveGembaModule(null)
+              }
+              onComplete={
+                handleCompleteSafety
+              }
+            />
+          )}
+
+        {currentPage === "nuevo-gemba" &&
+          gembaStarted &&
+          activeGembaModule ===
+            "calidad" &&
+          !showGembaSummary && (
+            <Calidad
+              gembaData={gembaData}
+              initialData={moduleResults.calidad}
+              onBack={() =>
+                setActiveGembaModule(null)
+              }
+              onComplete={
+                handleCompleteQuality
+              }
+            />
+          )}
+
+        {currentPage === "nuevo-gemba" &&
+          gembaStarted &&
+          activeGembaModule ===
+            "proceso" &&
+          !showGembaSummary && (
+            <Proceso
+              gembaData={gembaData}
+              initialData={moduleResults.proceso}
+              onBack={() =>
+                setActiveGembaModule(null)
+              }
+              onComplete={
+                handleCompleteProcess
+              }
+            />
+          )}
+
+        {currentPage === "nuevo-gemba" &&
+          gembaStarted &&
+          activeGembaModule ===
+            "mantenimiento" &&
+          !showGembaSummary && (
+            <Mantenimiento
+              gembaData={gembaData}
+              initialData={moduleResults.mantenimiento}
+              onBack={() =>
+                setActiveGembaModule(null)
+              }
+              onComplete={
+                handleCompleteMaintenance
+              }
+            />
+          )}
+
+        {currentPage === "nuevo-gemba" &&
+          gembaStarted &&
+          showGembaSummary && (
+            <ResumenGemba
+              gembaData={gembaData}
+              moduleResults={
+                moduleResults
+              }
+              onBack={
+                handleBackFromSummary
+              }
+              onConfirm={
+                handleConfirmGemba
+              }
+            />
+          )}
+
+        {currentPage ===
+          "plan-accion" && (
+          <PlanAccion />
+        )}
+
+        {currentPage ===
+          "mantenimiento" && (
+          <GestionMantenimiento />
+        )}
+
+        {currentPage ===
+          "mis-tareas" && (
+          <PlaceholderPage
+            title="Mis tareas"
+            text="Aquí cada responsable visualizará y gestionará las actividades que tiene asignadas."
+            Icon={ListTodo}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+
+function getInitials(nombre) {
+  return nombre
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte[0])
+    .join("")
+    .toUpperCase();
+}
+
+function LoginPage({ onLogin }) {
+  const [selectedUser, setSelectedUser] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  function handleSubmit(event) {
+    event.preventDefault();
+
+    const user = usuarios.find(
+      (item) => item.nombre === selectedUser
     );
 
-    const {
-      error,
-    } = await supabase
-      .from("plan_accion")
-      .update({
-        estado:
-          nuevoEstado,
-
-        fecha_cierre:
-          nuevoEstado ===
-          "Terminada"
-            ? new Date().toISOString()
-            : null,
-      })
-      .eq("id", accionId);
-
-    if (error) {
-      console.error(
-        "Error al cambiar estado:",
-        error
-      );
-
-      setAcciones(
-        (previous) =>
-          previous.map(
-            (item) =>
-              item.id ===
-              accionId
-                ? accionAnterior
-                : item
-          )
-      );
-
-      alert(
-        `No se pudo cambiar el estado.\n\n${error.message}`
-      );
+    if (!user || user.password !== password) {
+      setError("Usuario o contraseña incorrectos.");
+      return;
     }
+
+    setError("");
+    onLogin(user);
   }
 
-  function getEstiloEstado(
-    estado
-  ) {
-    if (
-      estado === "Terminada"
-    ) {
-      return {
-        background:
-          "#dcfce7",
-        color: "#15803d",
-        border:
-          "1px solid #bbf7d0",
-      };
-    }
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        padding: "24px",
+        background: "#f5f7fb",
+      }}
+    >
+      <form
+        className="gemba-form-card"
+        onSubmit={handleSubmit}
+        style={{ width: "100%", maxWidth: "440px" }}
+      >
+        <div style={{ textAlign: "center", marginBottom: "28px" }}>
+          <div
+            className="brand-icon"
+            style={{ margin: "0 auto 16px" }}
+          >
+            <Footprints size={24} />
+          </div>
 
-    if (
-      estado ===
-      "En proceso"
-    ) {
-      return {
-        background:
-          "#fef3c7",
-        color: "#b45309",
-        border:
-          "1px solid #fde68a",
-      };
-    }
+          <span className="eyebrow">Gestión de Rutina</span>
+          <h2 style={{ margin: 0 }}>GDR Gemba</h2>
+          <p
+            style={{
+              margin: "8px 0 0",
+              color: "#667085",
+              fontSize: "13px",
+            }}
+          >
+            Iniciá sesión para continuar.
+          </p>
+        </div>
 
-    return {
-      background:
-        "#fee2e2",
-      color: "#b91c1c",
-      border:
-        "1px solid #fecaca",
-    };
-  }
+        <div style={{ display: "grid", gap: "18px" }}>
+          <label className="form-field">
+            <span>
+              <User size={17} />
+              Usuario
+            </span>
 
-  function getClasePrioridad(
-    prioridad
-  ) {
-    if (
-      prioridad === "Baja"
-    ) {
-      return "baja";
-    }
+            <select
+              value={selectedUser}
+              onChange={(event) => {
+                setSelectedUser(event.target.value);
+                setPassword("");
+                setError("");
+              }}
+            >
+              <option value="">Seleccionar usuario</option>
 
-    if (
-      prioridad === "Media"
-    ) {
-      return "media";
-    }
+              {usuarios.map((user) => (
+                <option value={user.nombre} key={user.nombre}>
+                  {user.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
 
-    if (
-      prioridad === "Alta"
-    ) {
-      return "alta";
-    }
+          <label className="form-field">
+            <span>
+              <LogIn size={17} />
+              Contraseña
+            </span>
 
-    return "crítica";
-  }
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                setError("");
+              }}
+              autoComplete="current-password"
+            />
+          </label>
 
+          {error && (
+            <div
+              style={{
+                padding: "11px 12px",
+                borderRadius: "10px",
+                background: "#fff1f2",
+                color: "#be123c",
+                fontSize: "12px",
+                fontWeight: 700,
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="primary-button"
+            disabled={!selectedUser || !password}
+          >
+            <LogIn size={18} />
+            Iniciar sesión
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function Dashboard({
+  modules,
+  onNewGemba,
+}) {
   return (
     <>
       <header className="page-header">
         <div>
           <span className="eyebrow">
-            Gestión de acciones
+            Gestión de Rutina
           </span>
 
           <h2>
-            Plan de Acción
+            Dashboard Gemba
           </h2>
 
           <p>
-            Convertí los hallazgos
-            del Gemba y las
-            oportunidades manuales
-            en acciones con
-            responsable, fecha y
-            seguimiento.
+            Observá, detectá oportunidades
+            y asegurá el cierre de las
+            acciones.
           </p>
         </div>
 
         <button
-          type="button"
           className="primary-button"
-          onClick={
-            abrirNuevaAccion
-          }
+          onClick={onNewGemba}
         >
-          <Plus size={19} />
-          Nueva acción
+          <Footprints size={20} />
+
+          Nuevo Gemba Walk
         </button>
       </header>
 
       <section className="kpi-grid">
         <div className="kpi-card">
           <span>
-            Pendientes
+            Gembas este mes
           </span>
 
           <strong>
-            {
-              indicadores.pendientes
-            }
+            24
           </strong>
 
           <small>
-            Aún no iniciadas
+            +6 vs. mes anterior
           </small>
         </div>
 
         <div className="kpi-card">
           <span>
-            En proceso
+            Hallazgos abiertos
           </span>
 
           <strong>
-            {
-              indicadores.enProceso
-            }
+            17
           </strong>
 
           <small>
-            Acciones activas
+            5 de prioridad alta
           </small>
         </div>
 
         <div className="kpi-card">
           <span>
-            Terminadas
-          </span>
-
-          <strong>
-            {
-              indicadores.terminadas
-            }
-          </strong>
-
-          <small>
             Acciones cerradas
+          </span>
+
+          <strong>
+            43
+          </strong>
+
+          <small>
+            82% de cumplimiento
           </small>
         </div>
 
         <div className="kpi-card">
           <span>
-            Vencidas
+            Acciones vencidas
           </span>
 
           <strong>
-            {
-              indicadores.vencidas
-            }
+            6
           </strong>
 
           <small>
-            Fecha compromiso vencida
+            Requieren seguimiento
           </small>
         </div>
       </section>
-
-      {mostrarFormulario && (
-        <section
-          className="section-block"
-          style={{
-            marginBottom:
-              "22px",
-          }}
-        >
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">
-                {modoEdicion
-                  ? "Seguimiento"
-                  : "Nueva acción"}
-              </span>
-
-              <h3>
-                {modoEdicion
-                  ? "Editar Plan de Acción"
-                  : "Crear acción manual"}
-              </h3>
-            </div>
-
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => {
-                limpiarFormulario();
-
-                setMostrarFormulario(
-                  false
-                );
-              }}
-            >
-              <X size={17} />
-              Cerrar
-            </button>
-          </div>
-
-          <form
-            onSubmit={
-              guardarAccion
-            }
-          >
-            <div className="form-grid">
-              <label className="form-field">
-                <span>
-                  <ClipboardList
-                    size={17}
-                  />
-                  Origen
-                </span>
-
-                <input
-                  type="text"
-                  value={
-                    nuevaAccion.origen
-                  }
-                  readOnly
-                  disabled
-                />
-              </label>
-
-              <label className="form-field">
-                <span>
-                  <Workflow
-                    size={17}
-                  />
-                  Pilar / Categoría
-                </span>
-
-                <select
-                  name="pilar"
-                  value={
-                    nuevaAccion.pilar
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                >
-                  <option value="">
-                    Seleccionar
-                  </option>
-
-                  {PILARES.map(
-                    (pilar) => (
-                      <option
-                        key={pilar}
-                        value={pilar}
-                      >
-                        {pilar}
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-
-              <label className="form-field">
-                <span>
-                  <Factory
-                    size={17}
-                  />
-                  Máquina / Equipo
-                </span>
-
-                <select
-                  name="maquina"
-                  value={
-                    nuevaAccion.maquina
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                >
-                  <option value="">
-                    Sin equipo específico
-                  </option>
-
-                  {maquinas.map(
-                    (maquina) => (
-                      <option
-                        key={maquina}
-                        value={maquina}
-                      >
-                        {maquina}
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-
-              <label className="form-field">
-                <span>
-                  <Workflow
-                    size={17}
-                  />
-                  Proceso
-                </span>
-
-                <select
-                  name="proceso"
-                  value={
-                    nuevaAccion.proceso
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                  disabled={
-                    !nuevaAccion.maquina
-                  }
-                >
-                  <option value="">
-                    {!nuevaAccion.maquina
-                      ? "Seleccioná primero una máquina"
-                      : "Seleccionar proceso"}
-                  </option>
-
-                  {procesosDisponibles.map(
-                    (proceso) => (
-                      <option
-                        key={proceso}
-                        value={proceso}
-                      >
-                        {proceso}
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-
-              <label className="form-field">
-                <span>
-                  <AlertTriangle
-                    size={17}
-                  />
-                  Prioridad
-                </span>
-
-                <select
-                  name="prioridad"
-                  value={
-                    nuevaAccion.prioridad
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                >
-                  {PRIORIDADES.map(
-                    (prioridad) => (
-                      <option
-                        key={
-                          prioridad
-                        }
-                        value={
-                          prioridad
-                        }
-                      >
-                        {
-                          prioridad
-                        }
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-
-              <label className="form-field">
-                <span>
-                  <Filter
-                    size={17}
-                  />
-                  Estado
-                </span>
-
-                <select
-                  name="estado"
-                  value={
-                    nuevaAccion.estado
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                >
-                  {ESTADOS.map(
-                    (estado) => (
-                      <option
-                        key={estado}
-                        value={estado}
-                      >
-                        {estado}
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>
-                  <AlertTriangle
-                    size={17}
-                  />
-                  Hallazgo / Situación
-                </span>
-
-                <textarea
-                  rows="3"
-                  name="hallazgo"
-                  value={
-                    nuevaAccion.hallazgo
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                  placeholder="Describí la situación detectada."
-                />
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>
-                  <CheckCircle2
-                    size={17}
-                  />
-                  What · ¿Qué se hará?
-                </span>
-
-                <textarea
-                  rows="3"
-                  name="que"
-                  value={
-                    nuevaAccion.que
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                  placeholder="Definí claramente la acción."
-                />
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>
-                  <ClipboardList
-                    size={17}
-                  />
-                  Why · ¿Por qué?
-                </span>
-
-                <textarea
-                  rows="3"
-                  name="porQue"
-                  value={
-                    nuevaAccion.porQue
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                  placeholder="Justificación o causa que se desea corregir."
-                />
-              </label>
-
-              <label className="form-field">
-                <span>
-                  <User size={17} />
-                  Who · Responsable
-                </span>
-
-                <input
-                  type="text"
-                  name="responsable"
-                  value={
-                    nuevaAccion.responsable
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                  list="responsables-plan-accion"
-                  placeholder="Nombre del responsable"
-                />
-
-                <datalist id="responsables-plan-accion">
-                  {responsables.map(
-                    (responsable) => (
-                      <option
-                        key={
-                          responsable
-                        }
-                        value={
-                          responsable
-                        }
-                      />
-                    )
-                  )}
-                </datalist>
-              </label>
-
-              <label className="form-field">
-                <span>
-                  <CalendarDays
-                    size={17}
-                  />
-                  When · Fecha compromiso
-                </span>
-
-                <input
-                  type="date"
-                  name="fechaCompromiso"
-                  value={
-                    nuevaAccion.fechaCompromiso
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                />
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>
-                  <Workflow
-                    size={17}
-                  />
-                  How · ¿Cómo se realizará?
-                </span>
-
-                <textarea
-                  rows="3"
-                  name="como"
-                  value={
-                    nuevaAccion.como
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                  placeholder="Método o forma de ejecución."
-                />
-              </label>
-
-              <label className="form-field">
-                <span>
-                  <ClipboardList
-                    size={17}
-                  />
-                  How much · Costo estimado
-                </span>
-
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  name="costoEstimado"
-                  value={
-                    nuevaAccion.costoEstimado
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                  placeholder="Opcional"
-                />
-              </label>
-
-              <label className="form-field">
-                <span>
-                  <User size={17} />
-                  Auditor / Solicitante
-                </span>
-
-                <input
-                  type="text"
-                  name="auditor"
-                  value={
-                    nuevaAccion.auditor
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                  placeholder="Opcional"
-                />
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>
-                  <ClipboardList
-                    size={17}
-                  />
-                  Observaciones
-                </span>
-
-                <textarea
-                  rows="3"
-                  name="observaciones"
-                  value={
-                    nuevaAccion.observaciones
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                />
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>
-                  <CheckCircle2
-                    size={17}
-                  />
-                  Evidencia / Cierre
-                </span>
-
-                <textarea
-                  rows="3"
-                  name="evidencia"
-                  value={
-                    nuevaAccion.evidencia
-                  }
-                  onChange={
-                    handleAccionChange
-                  }
-                  placeholder="Descripción de evidencia o resultado final."
-                />
-              </label>
-            </div>
-
-            <div className="form-actions">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => {
-                  limpiarFormulario();
-
-                  setMostrarFormulario(
-                    false
-                  );
-                }}
-              >
-                Cancelar
-              </button>
-
-              <button
-                type="submit"
-                className="primary-button"
-                disabled={
-                  guardando
-                }
-              >
-                <CheckCircle2
-                  size={18}
-                />
-
-                {guardando
-                  ? "Guardando..."
-                  : modoEdicion
-                    ? "Guardar cambios"
-                    : "Crear acción"}
-              </button>
-            </div>
-          </form>
-        </section>
-      )}
 
       <section className="section-block">
         <div className="section-heading">
           <div>
             <span className="eyebrow">
-              Seguimiento
+              Pilares Gemba
             </span>
 
             <h3>
-              Acciones
+              Módulos de observación
             </h3>
           </div>
 
           <p>
-            Filtrá las acciones
-            por origen, pilar,
-            responsable, estado,
-            prioridad o equipo.
+            Cuatro enfoques para observar
+            el trabajo real e identificar
+            oportunidades de mejora.
           </p>
         </div>
 
-        <div
-          className="form-grid"
-          style={{
-            marginBottom:
-              "22px",
-          }}
-        >
-          <label className="form-field">
-            <span>
-              <Search size={17} />
-              Buscar
-            </span>
+        <div className="module-grid">
+          {modules.map((module) => {
+            const Icon =
+              module.icon;
 
-            <input
-              type="text"
-              name="busqueda"
-              value={
-                filtros.busqueda
-              }
-              onChange={
-                handleFiltroChange
-              }
-              placeholder="Buscar hallazgo, acción, equipo..."
-            />
-          </label>
+            return (
+              <article
+                className="module-card"
+                key={module.id}
+              >
+                <div
+                  className={`module-icon ${module.id}`}
+                >
+                  <Icon size={25} />
+                </div>
 
-          <label className="form-field">
-            <span>
-              <ClipboardList
-                size={17}
-              />
-              Origen
-            </span>
+                <div>
+                  <h4>
+                    {module.name}
+                  </h4>
 
-            <select
-              name="origen"
-              value={
-                filtros.origen
-              }
-              onChange={
-                handleFiltroChange
-              }
-            >
-              <option value="">
-                Todos
-              </option>
-
-              <option value="Gemba">
-                Gemba
-              </option>
-
-              <option value="Manual">
-                Manual
-              </option>
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>
-              <Workflow
-                size={17}
-              />
-              Pilar
-            </span>
-
-            <select
-              name="pilar"
-              value={
-                filtros.pilar
-              }
-              onChange={
-                handleFiltroChange
-              }
-            >
-              <option value="">
-                Todos
-              </option>
-
-              {PILARES.map(
-                (pilar) => (
-                  <option
-                    key={pilar}
-                    value={pilar}
-                  >
-                    {pilar}
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>
-              <User size={17} />
-              Responsable
-            </span>
-
-            <select
-              name="responsable"
-              value={
-                filtros.responsable
-              }
-              onChange={
-                handleFiltroChange
-              }
-            >
-              <option value="">
-                Todos
-              </option>
-
-              {responsables.map(
-                (responsable) => (
-                  <option
-                    key={
-                      responsable
-                    }
-                    value={
-                      responsable
-                    }
-                  >
+                  <p>
                     {
-                      responsable
+                      module.description
                     }
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>
-              <Filter size={17} />
-              Estado
-            </span>
-
-            <select
-              name="estado"
-              value={
-                filtros.estado
-              }
-              onChange={
-                handleFiltroChange
-              }
-            >
-              <option value="">
-                Todos
-              </option>
-
-              {ESTADOS.map(
-                (estado) => (
-                  <option
-                    key={estado}
-                    value={estado}
-                  >
-                    {estado}
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>
-              <AlertTriangle
-                size={17}
-              />
-              Prioridad
-            </span>
-
-            <select
-              name="prioridad"
-              value={
-                filtros.prioridad
-              }
-              onChange={
-                handleFiltroChange
-              }
-            >
-              <option value="">
-                Todas
-              </option>
-
-              {PRIORIDADES.map(
-                (prioridad) => (
-                  <option
-                    key={
-                      prioridad
-                    }
-                    value={
-                      prioridad
-                    }
-                  >
-                    {
-                      prioridad
-                    }
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>
-              <Factory
-                size={17}
-              />
-              Equipo
-            </span>
-
-            <select
-              name="maquina"
-              value={
-                filtros.maquina
-              }
-              onChange={
-                handleFiltroChange
-              }
-            >
-              <option value="">
-                Todos
-              </option>
-
-              {maquinas.map(
-                (maquina) => (
-                  <option
-                    key={maquina}
-                    value={maquina}
-                  >
-                    {maquina}
-                  </option>
-                )
-              )}
-            </select>
-          </label>
+                  </p>
+                </div>
+              </article>
+            );
+          })}
         </div>
-
-        {loading ? (
-          <div
-            className="finding-entry-card"
-            style={{
-              textAlign:
-                "center",
-              padding:
-                "30px",
-            }}
-          >
-            <strong>
-              Cargando acciones...
-            </strong>
-          </div>
-        ) : accionesFiltradas.length ===
-          0 ? (
-          <div
-            className="finding-entry-card"
-            style={{
-              textAlign:
-                "center",
-              padding:
-                "30px",
-            }}
-          >
-            <ClipboardList
-              size={32}
-              style={{
-                marginBottom:
-                  "10px",
-              }}
-            />
-
-            <strong>
-              No hay acciones con
-              estos filtros.
-            </strong>
-          </div>
-        ) : (
-          <div className="findings-list">
-            {accionesFiltradas.map(
-              (accion) => {
-                const vencida =
-                  estaVencida(
-                    accion
-                  );
-
-                return (
-                  <article
-                    key={
-                      accion.id
-                    }
-                    className="finding-item"
-                    style={
-                      vencida
-                        ? {
-                            borderColor:
-                              "#fecaca",
-                            background:
-                              "#fffafa",
-                          }
-                        : undefined
-                    }
-                  >
-                    <div className="finding-index">
-                      <ClipboardList
-                        size={15}
-                      />
-                    </div>
-
-                    <div className="finding-item-content">
-                      <div className="finding-item-top">
-                        <div>
-                          <p>
-                            <strong>
-                              {
-                                accion.hallazgo
-                              }
-                            </strong>
-                          </p>
-
-                          {accion.que && (
-                            <p>
-                              <strong>
-                                Acción:
-                              </strong>{" "}
-                              {
-                                accion.que
-                              }
-                            </p>
-                          )}
-
-                          <p>
-                            <strong>
-                              Responsable:
-                            </strong>{" "}
-                            {accion.responsable ||
-                              "Sin asignar"}
-                          </p>
-
-                          <p>
-                            <strong>
-                              Fecha compromiso:
-                            </strong>{" "}
-                            {formatDate(
-                              accion.fechaCompromiso
-                            )}
-                          </p>
-
-                          {(accion.maquina ||
-                            accion.proceso) && (
-                            <p>
-                              <strong>
-                                Contexto:
-                              </strong>{" "}
-                              {[
-                                accion.maquina,
-                                accion.proceso,
-                              ]
-                                .filter(
-                                  Boolean
-                                )
-                                .join(
-                                  " · "
-                                )}
-                            </p>
-                          )}
-                        </div>
-
-                        <div
-                          style={{
-                            display:
-                              "flex",
-                            gap:
-                              "8px",
-                            alignItems:
-                              "center",
-                            flexWrap:
-                              "wrap",
-                          }}
-                        >
-                          <button
-                            type="button"
-                            className="secondary-button"
-                            onClick={() =>
-                              editarAccion(
-                                accion
-                              )
-                            }
-                          >
-                            <Pencil
-                              size={16}
-                            />
-                            Editar
-                          </button>
-
-                          <button
-                            type="button"
-                            className="icon-delete-button"
-                            onClick={() =>
-                              eliminarAccion(
-                                accion
-                              )
-                            }
-                            title="Eliminar acción"
-                            aria-label={`Eliminar acción ${accion.hallazgo}`}
-                          >
-                            <Trash2
-                              size={17}
-                            />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="finding-tags">
-                        <span
-                          className={`criticality-tag ${getClasePrioridad(
-                            accion.prioridad
-                          )}`}
-                        >
-                          {
-                            accion.prioridad
-                          }
-                        </span>
-
-                        <span className="status-pill">
-                          {
-                            accion.pilar
-                          }
-                        </span>
-
-                        <span className="status-pill">
-                          Origen:{" "}
-                          {
-                            accion.origen
-                          }
-                        </span>
-
-                        {vencida && (
-                          <span
-                            className="criticality-tag crítica"
-                          >
-                            Vencida
-                          </span>
-                        )}
-
-                        <div
-                          style={{
-                            position:
-                              "relative",
-                            width:
-                              "170px",
-                            flexShrink:
-                              0,
-                          }}
-                        >
-                          <button
-                            type="button"
-                            aria-haspopup="listbox"
-                            aria-expanded={
-                              estadoAbiertoId ===
-                              accion.id
-                            }
-                            onClick={() =>
-                              setEstadoAbiertoId(
-                                (
-                                  previous
-                                ) =>
-                                  previous ===
-                                  accion.id
-                                    ? null
-                                    : accion.id
-                              )
-                            }
-                            style={{
-                              ...getEstiloEstado(
-                                accion.estado
-                              ),
-                              width:
-                                "170px",
-                              minHeight:
-                                "34px",
-                              borderRadius:
-                                "999px",
-                              padding:
-                                "6px 32px 6px 14px",
-                              fontSize:
-                                "12px",
-                              fontWeight:
-                                700,
-                              cursor:
-                                "pointer",
-                              outline:
-                                "none",
-                              position:
-                                "relative",
-                              display:
-                                "flex",
-                              alignItems:
-                                "center",
-                              justifyContent:
-                                "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                width:
-                                  "100%",
-                                textAlign:
-                                  "center",
-                                whiteSpace:
-                                  "nowrap",
-                              }}
-                            >
-                              {
-                                accion.estado
-                              }
-                            </span>
-
-                            <ChevronDown
-                              size={16}
-                              style={{
-                                position:
-                                  "absolute",
-                                right:
-                                  "10px",
-                                top:
-                                  "50%",
-                                transform:
-                                  estadoAbiertoId ===
-                                  accion.id
-                                    ? "translateY(-50%) rotate(180deg)"
-                                    : "translateY(-50%)",
-                              }}
-                            />
-                          </button>
-
-                          {estadoAbiertoId ===
-                            accion.id && (
-                            <div
-                              role="listbox"
-                              style={{
-                                position:
-                                  "absolute",
-                                top:
-                                  "calc(100% + 6px)",
-                                left: 0,
-                                width:
-                                  "170px",
-                                zIndex:
-                                  50,
-                                background:
-                                  "white",
-                                border:
-                                  "1px solid #dfe4ea",
-                                borderRadius:
-                                  "12px",
-                                boxShadow:
-                                  "0 12px 30px rgba(15, 23, 42, 0.14)",
-                                overflow:
-                                  "hidden",
-                              }}
-                            >
-                              {ESTADOS.map(
-                                (
-                                  estado
-                                ) => {
-                                  const seleccionado =
-                                    accion.estado ===
-                                    estado;
-
-                                  return (
-                                    <button
-                                      key={
-                                        estado
-                                      }
-                                      type="button"
-                                      role="option"
-                                      aria-selected={
-                                        seleccionado
-                                      }
-                                      onClick={async () => {
-                                        setEstadoAbiertoId(
-                                          null
-                                        );
-
-                                        if (
-                                          !seleccionado
-                                        ) {
-                                          await cambiarEstadoDirecto(
-                                            accion.id,
-                                            estado
-                                          );
-                                        }
-                                      }}
-                                      style={{
-                                        width:
-                                          "100%",
-                                        border:
-                                          0,
-                                        borderBottom:
-                                          estado !==
-                                          "Terminada"
-                                            ? "1px solid #eef2f7"
-                                            : "none",
-                                        padding:
-                                          "10px 12px",
-                                        background:
-                                          seleccionado
-                                            ? getEstiloEstado(
-                                                estado
-                                              )
-                                                .background
-                                            : "white",
-                                        color:
-                                          getEstiloEstado(
-                                            estado
-                                          )
-                                            .color,
-                                        fontSize:
-                                          "12px",
-                                        fontWeight:
-                                          seleccionado
-                                            ? 800
-                                            : 700,
-                                        cursor:
-                                          "pointer",
-                                        textAlign:
-                                          "center",
-                                      }}
-                                    >
-                                      {
-                                        estado
-                                      }
-                                    </button>
-                                  );
-                                }
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {accion.observaciones && (
-                        <p
-                          style={{
-                            marginTop:
-                              "12px",
-                            color:
-                              "#667085",
-                            fontSize:
-                              "12px",
-                          }}
-                        >
-                          <strong>
-                            Observaciones:
-                          </strong>{" "}
-                          {
-                            accion.observaciones
-                          }
-                        </p>
-                      )}
-                    </div>
-                  </article>
-                );
-              }
-            )}
-          </div>
-        )}
       </section>
     </>
   );
 }
 
-export default PlanAccion;
+function NewGembaForm({
+  gembaData,
+  maquinas,
+  procesosDisponibles,
+  colaboradores,
+  currentDate,
+  onChange,
+  onSubmit,
+  onCancel,
+}) {
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <span className="eyebrow">
+            Nuevo recorrido
+          </span>
+
+          <h2>
+            Iniciar Gemba Walk
+          </h2>
+
+          <p>
+            Registrá el contexto de la
+            observación antes de iniciar
+            el recorrido.
+          </p>
+        </div>
+      </header>
+
+      <section className="gemba-form-layout">
+        <form
+          className="gemba-form-card"
+          onSubmit={onSubmit}
+        >
+          <div className="form-card-header">
+            <div>
+              <span className="step-label">
+                Paso 1 de 2
+              </span>
+
+              <h3>
+                Datos generales
+              </h3>
+
+              <p>
+                Esta información quedará
+                asociada a todos los
+                hallazgos registrados
+                durante el Gemba.
+              </p>
+            </div>
+
+            <div className="date-badge">
+              <CalendarDays
+                size={18}
+              />
+
+              <span>
+                {currentDate}
+              </span>
+            </div>
+          </div>
+
+          <div className="form-grid">
+            <label className="form-field">
+              <span>
+                <Factory size={17} />
+                Máquina / Equipo
+              </span>
+
+              <select
+                name="maquina"
+                value={
+                  gembaData.maquina
+                }
+                onChange={onChange}
+              >
+                <option value="">
+                  Seleccionar máquina
+                </option>
+
+                {maquinas.map(
+                  (maquina) => (
+                    <option
+                      value={maquina}
+                      key={maquina}
+                    >
+                      {maquina}
+                    </option>
+                  )
+                )}
+              </select>
+            </label>
+
+            <label className="form-field">
+              <span>
+                <Workflow size={17} />
+                Proceso
+              </span>
+
+              <select
+                name="proceso"
+                value={
+                  gembaData.proceso
+                }
+                onChange={onChange}
+                disabled={
+                  !gembaData.maquina
+                }
+              >
+                <option value="">
+                  {!gembaData.maquina
+                    ? "Primero seleccioná una máquina"
+                    : "Seleccionar proceso"}
+                </option>
+
+                {procesosDisponibles.map(
+                  (proceso) => (
+                    <option
+                      value={proceso}
+                      key={proceso}
+                    >
+                      {proceso}
+                    </option>
+                  )
+                )}
+              </select>
+            </label>
+
+            <label className="form-field">
+              <span>
+                <User size={17} />
+                Colaborador observado
+              </span>
+
+              <select
+                name="collaborator"
+                value={
+                  gembaData.collaborator
+                }
+                onChange={onChange}
+              >
+                <option value="">
+                  Seleccionar colaborador
+                </option>
+
+                {colaboradores.map(
+                  (colaborador) => (
+                    <option
+                      value={colaborador}
+                      key={colaborador}
+                    >
+                      {colaborador}
+                    </option>
+                  )
+                )}
+              </select>
+            </label>
+
+            <label className="form-field">
+              <span>
+                <Hammer size={17} />
+                Tarea observada
+              </span>
+
+              <input
+                type="text"
+                name="task"
+                value={
+                  gembaData.task
+                }
+                onChange={onChange}
+              />
+            </label>
+
+            <label className="form-field form-field-full">
+              <span>
+                <User size={17} />
+                Auditor
+              </span>
+
+              <input
+                type="text"
+                name="auditor"
+                value={gembaData.auditor}
+                readOnly
+                disabled
+              />
+            </label>
+          </div>
+
+          <div className="form-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={onCancel}
+            >
+              <ArrowLeft
+                size={18}
+              />
+
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              className="primary-button"
+            >
+              Iniciar Gemba
+
+              <ArrowRight
+                size={18}
+              />
+            </button>
+          </div>
+        </form>
+
+        <aside className="gemba-help-card">
+          <div className="help-icon">
+            <Footprints size={26} />
+          </div>
+
+          <h3>
+            Antes de comenzar
+          </h3>
+
+          <p>
+            Identificá claramente la
+            máquina, el proceso y la
+            actividad que estás
+            observando.
+          </p>
+
+          <div className="help-list">
+            <div>
+              <CheckCircle2
+                size={18}
+              />
+
+              <span>
+                Observá el trabajo real.
+              </span>
+            </div>
+
+            <div>
+              <CheckCircle2
+                size={18}
+              />
+
+              <span>
+                Conversá con el
+                colaborador.
+              </span>
+            </div>
+
+            <div>
+              <CheckCircle2
+                size={18}
+              />
+
+              <span>
+                Registrá evidencia
+                cuando aporte valor.
+              </span>
+            </div>
+
+            <div>
+              <CheckCircle2
+                size={18}
+              />
+
+              <span>
+                Buscá oportunidades,
+                no culpables.
+              </span>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </>
+  );
+}
+
+function GembaModules({
+  gembaData,
+  modules,
+  currentDate,
+  completedModules,
+  allModulesCompleted,
+  onBack,
+  onCancel,
+  onOpenModule,
+  onFinish,
+}) {
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <span className="eyebrow">
+            Gemba en curso
+          </span>
+
+          <h2>
+            Seleccioná un módulo
+          </h2>
+
+          <p>
+            Podrás recorrer los cuatro
+            pilares y registrar las
+            observaciones
+            correspondientes.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={onCancel}
+        >
+          Salir del Gemba
+        </button>
+      </header>
+
+      <section className="gemba-context-card">
+        <div className="context-item">
+          <span>
+            Máquina / Equipo
+          </span>
+
+          <strong>
+            {gembaData.maquina}
+          </strong>
+        </div>
+
+        <div className="context-item">
+          <span>
+            Proceso
+          </span>
+
+          <strong>
+            {gembaData.proceso}
+          </strong>
+        </div>
+
+        <div className="context-item">
+          <span>
+            Colaborador
+          </span>
+
+          <strong>
+            {
+              gembaData.collaborator
+            }
+          </strong>
+        </div>
+
+        <div className="context-item">
+          <span>
+            Tarea
+          </span>
+
+          <strong>
+            {gembaData.task}
+          </strong>
+        </div>
+
+        <div className="context-item">
+          <span>
+            Auditor
+          </span>
+
+          <strong>
+            {gembaData.auditor}
+          </strong>
+        </div>
+      </section>
+
+      <section className="section-block">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">
+              Paso 2 de 2
+            </span>
+
+            <h3>
+              Módulos del Gemba
+            </h3>
+          </div>
+
+          <p>
+            {currentDate}
+          </p>
+        </div>
+
+        <div className="gemba-module-grid">
+          {modules.map((module) => {
+            const Icon =
+              module.icon;
+
+            const completed =
+              module.status ===
+              "Completado";
+
+            return (
+              <button
+                type="button"
+                className={
+                  completed
+                    ? "gemba-module-card completed"
+                    : "gemba-module-card"
+                }
+                key={module.id}
+                onClick={() =>
+                  onOpenModule(
+                    module.id
+                  )
+                }
+              >
+                <div
+                  className={`module-icon ${module.id}`}
+                >
+                  <Icon size={27} />
+                </div>
+
+                <div className="gemba-module-content">
+                  <div className="module-title-row">
+                    <h4>
+                      {module.name}
+                    </h4>
+
+                    <span
+                      className={
+                        completed
+                          ? "status-pill completed"
+                          : "status-pill"
+                      }
+                    >
+                      {completed && (
+                        <CheckCircle2
+                          size={13}
+                        />
+                      )}
+
+                      {module.status}
+                    </span>
+                  </div>
+
+                  <p>
+                    {
+                      module.description
+                    }
+                  </p>
+
+                  <span className="enter-module">
+                    {completed
+                      ? "Revisar nuevamente"
+                      : "Iniciar revisión"}
+
+                    <ArrowRight
+                      size={17}
+                    />
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="gemba-bottom-actions">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onBack}
+          >
+            <ArrowLeft size={18} />
+
+            Editar datos generales
+          </button>
+
+          {allModulesCompleted ? (
+            <button
+              type="button"
+              className="primary-button"
+              onClick={onFinish}
+            >
+              <CheckCircle2
+                size={18}
+              />
+
+              Finalizar Gemba
+
+              <ArrowRight
+                size={18}
+              />
+            </button>
+          ) : (
+            <div className="gemba-progress">
+              <strong>
+                {completedModules} de 4
+              </strong>
+
+              <span>
+                módulos revisados
+              </span>
+            </div>
+          )}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function PlaceholderPage({
+  title,
+  text,
+  Icon,
+}) {
+  return (
+    <section className="placeholder-page">
+      <div className="placeholder-icon">
+        <Icon size={34} />
+      </div>
+
+      <span className="eyebrow">
+        GDR Gemba
+      </span>
+
+      <h2>
+        {title}
+      </h2>
+
+      <p>
+        {text}
+      </p>
+    </section>
+  );
+}
+
+export default App;
