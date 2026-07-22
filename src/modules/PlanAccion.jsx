@@ -1257,7 +1257,7 @@ function PlanAccion() {
                 background: "#fff",
                 border: "1px solid #e5e7eb",
                 borderRadius: "14px",
-                overflow: "hidden",
+                overflow: "visible",
               }}
             >
               <thead>
@@ -1464,10 +1464,10 @@ function PlanAccion() {
                             <div
                               style={{
                                 position: "absolute",
-                                top: "calc(100% + 6px)",
+                                bottom: "calc(100% + 6px)",
                                 right: 0,
                                 width: "160px",
-                                zIndex: 100,
+                                zIndex: 9999,
                                 background: "#fff",
                                 border: "1px solid #dfe4ea",
                                 borderRadius: "12px",
