@@ -13,28 +13,39 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-function Seguridad({ gembaData, onBack, onComplete }) {
+function Seguridad({
+  gembaData,
+  initialData,
+  onBack,
+  onComplete,
+}) {
   const [activeSection, setActiveSection] = useState("condiciones");
 
-  const [condiciones, setCondiciones] = useState({
-    existeDesvio: "",
-    hallazgos: [],
-  });
+  const [condiciones, setCondiciones] = useState(
+    initialData?.condiciones || {
+      existeDesvio: "",
+      hallazgos: [],
+    }
+  );
 
-  const [comportamiento, setComportamiento] = useState({
-    existeDesvio: "",
-    hallazgos: [],
-  });
+  const [comportamiento, setComportamiento] = useState(
+    initialData?.comportamiento || {
+      existeDesvio: "",
+      hallazgos: [],
+    }
+  );
 
-  const [procedimientos, setProcedimientos] = useState({
-    existeProcedimiento: "",
-    estaActualizado: "",
-    reflejaRealidad: "",
-    conoceYAplica: "",
-    responsable: "",
-    tipoAccion: "",
-    observaciones: "",
-  });
+  const [procedimientos, setProcedimientos] = useState(
+    initialData?.procedimientos || {
+      existeProcedimiento: "",
+      estaActualizado: "",
+      reflejaRealidad: "",
+      conoceYAplica: "",
+      responsable: "",
+      tipoAccion: "",
+      observaciones: "",
+    }
+  );
 
   const [nuevoHallazgoFisico, setNuevoHallazgoFisico] = useState({
     descripcion: "",
