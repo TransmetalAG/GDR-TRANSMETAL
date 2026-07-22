@@ -433,38 +433,94 @@ function App() {
   }
 
   async function handleConfirmGemba() {
-    const { error } = await supabase
-      .from("gembas")
-      .insert({
-        fecha: new Date().toISOString(),
-        maquina: gembaData.maquina,
-        proceso: gembaData.proceso,
-        colaborador: gembaData.collaborator,
-        tarea: gembaData.task,
-        auditor: gembaData.auditor,
-        estado: "Finalizado",
-        seguridad: moduleResults.seguridad,
-        calidad: moduleResults.calidad,
-        proceso_resultado: moduleResults.proceso,
-        mantenimiento: moduleResults.mantenimiento,
-      });
+    /*
+      1. Guardamos el Gemba y recuperamos su ID.
+      2. Si el pilar de Mantenimiento tiene anomalías,
+         creamos automáticamente una tarea por cada hallazgo.
+      3. Solo limpiamos el Gemba cuando todo termina correctamente.
+    */
 
-    if (error) {
+    const { data: gembaGuardado, error: gembaError } =
+      await supabase
+        .from("gembas")
+        .insert({
+          fecha: new Date().toISOString(),
+          maquina: gembaData.maquina,
+          proceso: gembaData.proceso,
+          colaborador: gembaData.collaborator,
+          tarea: gembaData.task,
+          auditor: gembaData.auditor,
+          estado: "Finalizado",
+          seguridad: moduleResults.seguridad,
+          calidad: moduleResults.calidad,
+          proceso_resultado: moduleResults.proceso,
+          mantenimiento: moduleResults.mantenimiento,
+        })
+        .select("id")
+        .single();
+
+    if (gembaError) {
       console.error(
         "Error al guardar el Gemba:",
-        error
+        gembaError
       );
 
       alert(
-        `No se pudo guardar el Gemba. No se perdió la información.\n\n${error.message}`
+        `No se pudo guardar el Gemba. No se perdió la información.\n\n${gembaError.message}`
       );
 
       return;
     }
 
-    alert(
-      "Gemba guardado y finalizado correctamente."
-    );
+    const hallazgosMantenimiento =
+      moduleResults.mantenimiento?.hallazgos || [];
+
+    if (hallazgosMantenimiento.length > 0) {
+      const tareasMantenimiento =
+        hallazgosMantenimiento.map((hallazgo) => ({
+          tipo_registro: "tarea",
+          equipo: gembaData.maquina,
+          tarea: hallazgo.descripcion,
+          responsable: null,
+          dia_programado: null,
+          tiempo_estimado_horas: null,
+          prioridad: hallazgo.prioridad || "Media",
+          estado: "Pendiente de asignación",
+          origen: "Gemba",
+          gemba_id: gembaGuardado.id,
+          observaciones: `Generada automáticamente desde Gemba. Proceso: ${gembaData.proceso}. Tarea observada: ${gembaData.task}. Auditor: ${gembaData.auditor}.`,
+          fecha_cierre: null,
+        }));
+
+      const { error: mantenimientoError } =
+        await supabase
+          .from("mantenimiento")
+          .insert(tareasMantenimiento);
+
+      if (mantenimientoError) {
+        console.error(
+          "El Gemba se guardó, pero hubo un error al crear las tareas de mantenimiento:",
+          mantenimientoError
+        );
+
+        alert(
+          `El Gemba sí quedó guardado, pero no se pudieron crear automáticamente las tareas de mantenimiento.\n\n${mantenimientoError.message}\n\nLos datos del Gemba se conservarán en pantalla para que podás revisarlos.`
+        );
+
+        return;
+      }
+    }
+
+    const mensajeFinal =
+      hallazgosMantenimiento.length > 0
+        ? `Gemba guardado y finalizado correctamente.\n\nSe enviaron ${hallazgosMantenimiento.length} ${
+            hallazgosMantenimiento.length === 1
+              ? "tarea"
+              : "tareas"
+          } a Gestión de Mantenimiento.`
+        : "Gemba guardado y finalizado correctamente.";
+
+    alert(mensajeFinal);
 
     setGembaStarted(false);
 
