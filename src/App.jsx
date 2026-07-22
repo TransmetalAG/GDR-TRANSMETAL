@@ -8,7 +8,6 @@ import {
   ShieldCheck,
   Award,
   Gauge,
-  Sparkles,
   ArrowLeft,
   ArrowRight,
   User,
@@ -25,6 +24,7 @@ import { colaboradores } from "./data/CatalogoColaboradores.js";
 import Seguridad from "./modules/Seguridad.jsx";
 import Calidad from "./modules/Calidad.jsx";
 import Proceso from "./modules/Proceso.jsx";
+import Mantenimiento from "./modules/Mantenimiento.jsx";
 
 function App() {
   const [currentPage, setCurrentPage] = useState("dashboard");
@@ -44,7 +44,6 @@ function App() {
     calidad: null,
     proceso: null,
     mantenimiento: null,
-    "cinco-s": null,
   });
 
   const baseModules = [
@@ -69,14 +68,8 @@ function App() {
     {
       id: "mantenimiento",
       name: "Mantenimiento",
-      description: "Detección y seguimiento de anomalías",
+      description: "Detección y seguimiento de anomalías del equipo",
       icon: Wrench,
-    },
-    {
-      id: "cinco-s",
-      name: "5S + Gestión Visual",
-      description: "Orden, limpieza, estándares y gestión visual",
-      icon: Sparkles,
     },
   ];
 
@@ -86,11 +79,31 @@ function App() {
   }));
 
   const navigation = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "nuevo-gemba", label: "Nuevo Gemba", icon: Footprints },
-    { id: "plan-accion", label: "Plan de Acción", icon: ClipboardList },
-    { id: "mantenimiento", label: "Mantenimiento", icon: Wrench },
-    { id: "mis-tareas", label: "Mis tareas", icon: ListTodo },
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: LayoutDashboard,
+    },
+    {
+      id: "nuevo-gemba",
+      label: "Nuevo Gemba",
+      icon: Footprints,
+    },
+    {
+      id: "plan-accion",
+      label: "Plan de Acción",
+      icon: ClipboardList,
+    },
+    {
+      id: "mantenimiento",
+      label: "Mantenimiento",
+      icon: Wrench,
+    },
+    {
+      id: "mis-tareas",
+      label: "Mis tareas",
+      icon: ListTodo,
+    },
   ];
 
   const maquinas = useMemo(() => {
@@ -116,7 +129,17 @@ function App() {
     timeStyle: "short",
   }).format(new Date());
 
-  const completedModules = Object.values(moduleResults).filter(Boolean).length;
+  const completedModules =
+    Object.values(moduleResults).filter(Boolean).length;
+
+  function getEmptyModuleResults() {
+    return {
+      seguridad: null,
+      calidad: null,
+      proceso: null,
+      mantenimiento: null,
+    };
+  }
 
   function handleInputChange(event) {
     const { name, value } = event.target;
@@ -164,13 +187,7 @@ function App() {
     setGembaStarted(false);
     setActiveGembaModule(null);
 
-    setModuleResults({
-      seguridad: null,
-      calidad: null,
-      proceso: null,
-      mantenimiento: null,
-      "cinco-s": null,
-    });
+    setModuleResults(getEmptyModuleResults());
   }
 
   function handleCancelGemba() {
@@ -185,13 +202,7 @@ function App() {
       auditor: "Pablo Hernández",
     });
 
-    setModuleResults({
-      seguridad: null,
-      calidad: null,
-      proceso: null,
-      mantenimiento: null,
-      "cinco-s": null,
-    });
+    setModuleResults(getEmptyModuleResults());
 
     setCurrentPage("dashboard");
   }
@@ -200,17 +211,11 @@ function App() {
     if (
       moduleId === "seguridad" ||
       moduleId === "calidad" ||
-      moduleId === "proceso"
+      moduleId === "proceso" ||
+      moduleId === "mantenimiento"
     ) {
       setActiveGembaModule(moduleId);
-      return;
     }
-
-    const moduleName =
-      baseModules.find((item) => item.id === moduleId)?.name ||
-      "Este módulo";
-
-    alert(`${moduleName} todavía no está construido.`);
   }
 
   function handleCompleteSafety(result) {
@@ -235,6 +240,15 @@ function App() {
     setModuleResults((previous) => ({
       ...previous,
       proceso: result,
+    }));
+
+    setActiveGembaModule(null);
+  }
+
+  function handleCompleteMaintenance(result) {
+    setModuleResults((previous) => ({
+      ...previous,
+      mantenimiento: result,
     }));
 
     setActiveGembaModule(null);
@@ -359,6 +373,16 @@ function App() {
             />
           )}
 
+        {currentPage === "nuevo-gemba" &&
+          gembaStarted &&
+          activeGembaModule === "mantenimiento" && (
+            <Mantenimiento
+              gembaData={gembaData}
+              onBack={() => setActiveGembaModule(null)}
+              onComplete={handleCompleteMaintenance}
+            />
+          )}
+
         {currentPage === "plan-accion" && (
           <PlaceholderPage
             title="Plan de Acción"
@@ -392,15 +416,22 @@ function Dashboard({ modules, onNewGemba }) {
     <>
       <header className="page-header">
         <div>
-          <span className="eyebrow">Gestión de Rutina</span>
+          <span className="eyebrow">
+            Gestión de Rutina
+          </span>
+
           <h2>Dashboard Gemba</h2>
 
           <p>
-            Observá, detectá oportunidades y asegurá el cierre de las acciones.
+            Observá, detectá oportunidades y asegurá el cierre
+            de las acciones.
           </p>
         </div>
 
-        <button className="primary-button" onClick={onNewGemba}>
+        <button
+          className="primary-button"
+          onClick={onNewGemba}
+        >
           <Footprints size={20} />
           Nuevo Gemba Walk
         </button>
@@ -435,13 +466,16 @@ function Dashboard({ modules, onNewGemba }) {
       <section className="section-block">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">Pilares Gemba</span>
+            <span className="eyebrow">
+              Pilares Gemba
+            </span>
+
             <h3>Módulos de observación</h3>
           </div>
 
           <p>
-            Cinco enfoques para observar el trabajo real e identificar
-            oportunidades de mejora.
+            Cuatro enfoques para observar el trabajo real e
+            identificar oportunidades de mejora.
           </p>
         </div>
 
@@ -450,8 +484,13 @@ function Dashboard({ modules, onNewGemba }) {
             const Icon = module.icon;
 
             return (
-              <article className="module-card" key={module.id}>
-                <div className={`module-icon ${module.id}`}>
+              <article
+                className="module-card"
+                key={module.id}
+              >
+                <div
+                  className={`module-icon ${module.id}`}
+                >
                   <Icon size={25} />
                 </div>
 
@@ -482,26 +521,35 @@ function NewGembaForm({
     <>
       <header className="page-header">
         <div>
-          <span className="eyebrow">Nuevo recorrido</span>
+          <span className="eyebrow">
+            Nuevo recorrido
+          </span>
+
           <h2>Iniciar Gemba Walk</h2>
 
           <p>
-            Registrá el contexto de la observación antes de iniciar el
-            recorrido.
+            Registrá el contexto de la observación antes de
+            iniciar el recorrido.
           </p>
         </div>
       </header>
 
       <section className="gemba-form-layout">
-        <form className="gemba-form-card" onSubmit={onSubmit}>
+        <form
+          className="gemba-form-card"
+          onSubmit={onSubmit}
+        >
           <div className="form-card-header">
             <div>
-              <span className="step-label">Paso 1 de 2</span>
+              <span className="step-label">
+                Paso 1 de 2
+              </span>
+
               <h3>Datos generales</h3>
 
               <p>
-                Esta información quedará asociada a todos los hallazgos
-                registrados durante el Gemba.
+                Esta información quedará asociada a todos los
+                hallazgos registrados durante el Gemba.
               </p>
             </div>
 
@@ -523,10 +571,15 @@ function NewGembaForm({
                 value={gembaData.maquina}
                 onChange={onChange}
               >
-                <option value="">Seleccionar máquina</option>
+                <option value="">
+                  Seleccionar máquina
+                </option>
 
                 {maquinas.map((maquina) => (
-                  <option value={maquina} key={maquina}>
+                  <option
+                    value={maquina}
+                    key={maquina}
+                  >
                     {maquina}
                   </option>
                 ))}
@@ -552,7 +605,10 @@ function NewGembaForm({
                 </option>
 
                 {procesosDisponibles.map((proceso) => (
-                  <option value={proceso} key={proceso}>
+                  <option
+                    value={proceso}
+                    key={proceso}
+                  >
                     {proceso}
                   </option>
                 ))}
@@ -570,10 +626,15 @@ function NewGembaForm({
                 value={gembaData.collaborator}
                 onChange={onChange}
               >
-                <option value="">Seleccionar colaborador</option>
+                <option value="">
+                  Seleccionar colaborador
+                </option>
 
                 {colaboradores.map((colaborador) => (
-                  <option value={colaborador} key={colaborador}>
+                  <option
+                    value={colaborador}
+                    key={colaborador}
+                  >
                     {colaborador}
                   </option>
                 ))}
@@ -630,7 +691,10 @@ function NewGembaForm({
               Cancelar
             </button>
 
-            <button type="submit" className="primary-button">
+            <button
+              type="submit"
+              className="primary-button"
+            >
               Iniciar Gemba
               <ArrowRight size={18} />
             </button>
@@ -645,8 +709,8 @@ function NewGembaForm({
           <h3>Antes de comenzar</h3>
 
           <p>
-            Identificá claramente la máquina, el proceso y la actividad que
-            estás observando.
+            Identificá claramente la máquina, el proceso y la
+            actividad que estás observando.
           </p>
 
           <div className="help-list">
@@ -662,12 +726,16 @@ function NewGembaForm({
 
             <div>
               <CheckCircle2 size={18} />
-              <span>Registrá evidencia cuando aporte valor.</span>
+              <span>
+                Registrá evidencia cuando aporte valor.
+              </span>
             </div>
 
             <div>
               <CheckCircle2 size={18} />
-              <span>Buscá oportunidades, no culpables.</span>
+              <span>
+                Buscá oportunidades, no culpables.
+              </span>
             </div>
           </div>
         </aside>
@@ -689,16 +757,22 @@ function GembaModules({
     <>
       <header className="page-header">
         <div>
-          <span className="eyebrow">Gemba en curso</span>
+          <span className="eyebrow">
+            Gemba en curso
+          </span>
+
           <h2>Seleccioná un módulo</h2>
 
           <p>
-            Podrás recorrer los cinco pilares y registrar las observaciones
-            correspondientes.
+            Podrás recorrer los cuatro pilares y registrar las
+            observaciones correspondientes.
           </p>
         </div>
 
-        <button className="secondary-button" onClick={onCancel}>
+        <button
+          className="secondary-button"
+          onClick={onCancel}
+        >
           Finalizar después
         </button>
       </header>
@@ -716,7 +790,9 @@ function GembaModules({
 
         <div className="context-item">
           <span>Colaborador</span>
-          <strong>{gembaData.collaborator}</strong>
+          <strong>
+            {gembaData.collaborator}
+          </strong>
         </div>
 
         <div className="context-item">
@@ -733,7 +809,10 @@ function GembaModules({
       <section className="section-block">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">Paso 2 de 2</span>
+            <span className="eyebrow">
+              Paso 2 de 2
+            </span>
+
             <h3>Módulos del Gemba</h3>
           </div>
 
@@ -743,7 +822,9 @@ function GembaModules({
         <div className="gemba-module-grid">
           {modules.map((module) => {
             const Icon = module.icon;
-            const completed = module.status === "Completado";
+
+            const completed =
+              module.status === "Completado";
 
             return (
               <button
@@ -754,9 +835,13 @@ function GembaModules({
                     : "gemba-module-card"
                 }
                 key={module.id}
-                onClick={() => onOpenModule(module.id)}
+                onClick={() =>
+                  onOpenModule(module.id)
+                }
               >
-                <div className={`module-icon ${module.id}`}>
+                <div
+                  className={`module-icon ${module.id}`}
+                >
                   <Icon size={27} />
                 </div>
 
@@ -771,7 +856,10 @@ function GembaModules({
                           : "status-pill"
                       }
                     >
-                      {completed && <CheckCircle2 size={13} />}
+                      {completed && (
+                        <CheckCircle2 size={13} />
+                      )}
+
                       {module.status}
                     </span>
                   </div>
@@ -792,13 +880,19 @@ function GembaModules({
         </div>
 
         <div className="gemba-bottom-actions">
-          <button className="secondary-button" onClick={onBack}>
+          <button
+            className="secondary-button"
+            onClick={onBack}
+          >
             <ArrowLeft size={18} />
             Editar datos generales
           </button>
 
           <div className="gemba-progress">
-            <strong>{completedModules} de 5</strong>
+            <strong>
+              {completedModules} de 4
+            </strong>
+
             <span>módulos revisados</span>
           </div>
         </div>
@@ -807,14 +901,20 @@ function GembaModules({
   );
 }
 
-function PlaceholderPage({ title, text, Icon }) {
+function PlaceholderPage({
+  title,
+  text,
+  Icon,
+}) {
   return (
     <section className="placeholder-page">
       <div className="placeholder-icon">
         <Icon size={34} />
       </div>
 
-      <span className="eyebrow">GDR Gemba</span>
+      <span className="eyebrow">
+        GDR Gemba
+      </span>
 
       <h2>{title}</h2>
 
