@@ -13,7 +13,6 @@ import {
   Pencil,
   Trash2,
   X,
-  ChevronDown,
 } from "lucide-react";
 
 import { catalogo } from "../data/CatalogoMaquinas.js";
@@ -132,7 +131,6 @@ function PlanAccion() {
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [modoEdicion, setModoEdicion] = useState(null);
-  const [estadoAbiertoId, setEstadoAbiertoId] = useState(null);
 
   const [acciones, setAcciones] = useState([]);
 
@@ -1405,123 +1403,42 @@ function PlanAccion() {
                           width: "180px",
                         }}
                       >
-                        <div
+                        <select
+                          value={accion.estado}
+                          onChange={(event) =>
+                            cambiarEstadoDirecto(
+                              accion.id,
+                              event.target.value
+                            )
+                          }
+                          aria-label={`Cambiar estado de ${accion.causa}`}
+                          title="Cambiar estado"
                           style={{
-                            position: "relative",
-                            width: "160px",
+                            ...getEstiloEstado(accion.estado),
+                            width: "150px",
+                            minHeight: "34px",
+                            borderRadius: "999px",
+                            padding: "6px 28px 6px 12px",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            outline: "none",
+                            textAlign: "center",
+                            textAlignLast: "center",
                           }}
                         >
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setEstadoAbiertoId((previous) =>
-                                previous === accion.id
-                                  ? null
-                                  : accion.id
-                              )
-                            }
-                            style={{
-                              ...getEstiloEstado(accion.estado),
-                              width: "160px",
-                              minHeight: "34px",
-                              borderRadius: "999px",
-                              padding: "6px 32px 6px 14px",
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              outline: "none",
-                              position: "relative",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: "100%",
-                                textAlign: "center",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {accion.estado}
-                            </span>
+                          <option value="Pendiente">
+                            Pendiente
+                          </option>
 
-                            <ChevronDown
-                              size={16}
-                              style={{
-                                position: "absolute",
-                                right: "10px",
-                                top: "50%",
-                                transform:
-                                  estadoAbiertoId === accion.id
-                                    ? "translateY(-50%) rotate(180deg)"
-                                    : "translateY(-50%)",
-                              }}
-                            />
-                          </button>
+                          <option value="En proceso">
+                            En proceso
+                          </option>
 
-                          {estadoAbiertoId === accion.id && (
-                            <div
-                              style={{
-                                position: "absolute",
-                                bottom: "calc(100% + 6px)",
-                                right: 0,
-                                width: "160px",
-                                zIndex: 9999,
-                                background: "#fff",
-                                border: "1px solid #dfe4ea",
-                                borderRadius: "12px",
-                                boxShadow:
-                                  "0 12px 30px rgba(15, 23, 42, 0.14)",
-                                overflow: "hidden",
-                              }}
-                            >
-                              {ESTADOS.map((estado) => {
-                                const seleccionado =
-                                  accion.estado === estado;
-
-                                return (
-                                  <button
-                                    key={estado}
-                                    type="button"
-                                    onClick={async () => {
-                                      setEstadoAbiertoId(null);
-
-                                      if (!seleccionado) {
-                                        await cambiarEstadoDirecto(
-                                          accion.id,
-                                          estado
-                                        );
-                                      }
-                                    }}
-                                    style={{
-                                      width: "100%",
-                                      border: 0,
-                                      borderBottom:
-                                        estado !== "Terminada"
-                                          ? "1px solid #eef2f7"
-                                          : "none",
-                                      padding: "10px 12px",
-                                      background: seleccionado
-                                        ? getEstiloEstado(estado).background
-                                        : "#fff",
-                                      color:
-                                        getEstiloEstado(estado).color,
-                                      fontSize: "12px",
-                                      fontWeight: seleccionado
-                                        ? 800
-                                        : 700,
-                                      cursor: "pointer",
-                                      textAlign: "center",
-                                    }}
-                                  >
-                                    {estado}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
+                          <option value="Terminada">
+                            Terminada
+                          </option>
+                        </select>
                       </td>
 
                       <td
