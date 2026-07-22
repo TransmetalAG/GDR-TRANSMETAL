@@ -16,10 +16,13 @@ import {
   CalendarDays,
   CheckCircle2,
   Workflow,
+  LogOut,
+  LogIn,
 } from "lucide-react";
 
 import { catalogo } from "./data/CatalogoMaquinas.js";
 import { colaboradores } from "./data/CatalogoColaboradores.js";
+import { usuarios } from "./data/CatalogoUsuarios.js";
 
 import Seguridad from "./modules/Seguridad.jsx";
 import Calidad from "./modules/Calidad.jsx";
@@ -30,7 +33,27 @@ import ResumenGemba from "./components/ResumenGemba.jsx";
 import { supabase } from "./lib/supabase.js";
 
 function App() {
-  const [currentPage, setCurrentPage] = useState("dashboard");
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem("gdr_user");
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [currentPage, setCurrentPage] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem("gdr_user");
+      const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+
+      return parsedUser?.rol === "Mantenimiento"
+        ? "mantenimiento"
+        : "dashboard";
+    } catch {
+      return "dashboard";
+    }
+  });
 
   const [gembaStarted, setGembaStarted] = useState(false);
 
@@ -45,7 +68,7 @@ function App() {
     proceso: "",
     collaborator: "",
     task: "",
-    auditor: "Pablo Hernández",
+    auditor: currentUser?.rol === "Mantenimiento" ? "" : currentUser?.nombre || "",
   });
 
   const [moduleResults, setModuleResults] = useState({
@@ -93,33 +116,42 @@ function App() {
       : "Pendiente",
   }));
 
-  const navigation = [
-    {
-      id: "dashboard",
-      label: "Dashboard",
-      icon: LayoutDashboard,
-    },
-    {
-      id: "nuevo-gemba",
-      label: "Nuevo Gemba",
-      icon: Footprints,
-    },
-    {
-      id: "plan-accion",
-      label: "Plan de Acción",
-      icon: ClipboardList,
-    },
-    {
-      id: "mantenimiento",
-      label: "Mantenimiento",
-      icon: Wrench,
-    },
-    {
-      id: "mis-tareas",
-      label: "Mis tareas",
-      icon: ListTodo,
-    },
-  ];
+  const navigation =
+    currentUser?.rol === "Mantenimiento"
+      ? [
+          {
+            id: "mantenimiento",
+            label: "Mantenimiento",
+            icon: Wrench,
+          },
+        ]
+      : [
+          {
+            id: "dashboard",
+            label: "Dashboard",
+            icon: LayoutDashboard,
+          },
+          {
+            id: "nuevo-gemba",
+            label: "Nuevo Gemba",
+            icon: Footprints,
+          },
+          {
+            id: "plan-accion",
+            label: "Plan de Acción",
+            icon: ClipboardList,
+          },
+          {
+            id: "mantenimiento",
+            label: "Mantenimiento",
+            icon: Wrench,
+          },
+          {
+            id: "mis-tareas",
+            label: "Mis tareas",
+            icon: ListTodo,
+          },
+        ];
 
   const maquinas = useMemo(() => {
     return [
@@ -175,8 +207,55 @@ function App() {
       proceso: "",
       collaborator: "",
       task: "",
-      auditor: "Pablo Hernández",
+      auditor:
+        currentUser?.rol === "Mantenimiento"
+          ? ""
+          : currentUser?.nombre || "",
     };
+  }
+
+  function handleLogin(user) {
+    setCurrentUser(user);
+    localStorage.setItem("gdr_user", JSON.stringify(user));
+
+    setGembaData({
+      maquina: "",
+      proceso: "",
+      collaborator: "",
+      task: "",
+      auditor: user.rol === "Mantenimiento" ? "" : user.nombre,
+    });
+
+    setCurrentPage(
+      user.rol === "Mantenimiento"
+        ? "mantenimiento"
+        : "dashboard"
+    );
+  }
+
+  function handleLogout() {
+    if (gembaStarted) {
+      const confirmLogout = window.confirm(
+        "Tenés un Gemba en curso. Si cerrás sesión, los datos no guardados se perderán. ¿Deseás continuar?"
+      );
+
+      if (!confirmLogout) return;
+    }
+
+    localStorage.removeItem("gdr_user");
+    setCurrentUser(null);
+    setCurrentPage("dashboard");
+    setGembaStarted(false);
+    setActiveGembaModule(null);
+    setShowGembaSummary(false);
+    setModuleResults(getEmptyModuleResults());
+    setGembaData({
+      maquina: "",
+      proceso: "",
+      collaborator: "",
+      task: "",
+      auditor: "",
+    });
   }
 
   function handleInputChange(event) {
@@ -229,6 +308,11 @@ function App() {
   }
 
   function handleNewGemba() {
+    if (currentUser?.rol === "Mantenimiento") {
+      setCurrentPage("mantenimiento");
+      return;
+    }
+
     setCurrentPage("nuevo-gemba");
 
     setGembaStarted(false);
@@ -442,6 +526,10 @@ function App() {
     }
   }
 
+  if (!currentUser) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -487,17 +575,37 @@ function App() {
 
         <div className="sidebar-user">
           <div className="avatar">
-            PH
+            {getInitials(currentUser.nombre)}
           </div>
 
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <strong>
-              Pablo Hernández
+              {currentUser.nombre}
             </strong>
 
             <span>
-              Auditor / Producción
+              {currentUser.rol}
             </span>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                marginTop: "9px",
+                padding: 0,
+                border: 0,
+                background: "transparent",
+                color: "#9ca3af",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "11px",
+                fontWeight: 700,
+              }}
+            >
+              <LogOut size={13} />
+              Cerrar sesión
+            </button>
           </div>
         </div>
       </aside>
@@ -673,6 +781,144 @@ function App() {
           />
         )}
       </main>
+    </div>
+  );
+}
+
+function getInitials(nombre) {
+  return nombre
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte[0])
+    .join("")
+    .toUpperCase();
+}
+
+function LoginPage({ onLogin }) {
+  const [selectedUser, setSelectedUser] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  function handleSubmit(event) {
+    event.preventDefault();
+
+    const user = usuarios.find(
+      (item) => item.nombre === selectedUser
+    );
+
+    if (!user || user.password !== password) {
+      setError("Usuario o contraseña incorrectos.");
+      return;
+    }
+
+    setError("");
+    onLogin(user);
+  }
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        padding: "24px",
+        background: "#f5f7fb",
+      }}
+    >
+      <form
+        className="gemba-form-card"
+        onSubmit={handleSubmit}
+        style={{ width: "100%", maxWidth: "440px" }}
+      >
+        <div style={{ textAlign: "center", marginBottom: "28px" }}>
+          <div
+            className="brand-icon"
+            style={{ margin: "0 auto 16px" }}
+          >
+            <Footprints size={24} />
+          </div>
+
+          <span className="eyebrow">Gestión de Rutina</span>
+          <h2 style={{ margin: 0 }}>GDR Gemba</h2>
+          <p
+            style={{
+              margin: "8px 0 0",
+              color: "#667085",
+              fontSize: "13px",
+            }}
+          >
+            Iniciá sesión para continuar.
+          </p>
+        </div>
+
+        <div style={{ display: "grid", gap: "18px" }}>
+          <label className="form-field">
+            <span>
+              <User size={17} />
+              Usuario
+            </span>
+
+            <select
+              value={selectedUser}
+              onChange={(event) => {
+                setSelectedUser(event.target.value);
+                setPassword("");
+                setError("");
+              }}
+            >
+              <option value="">Seleccionar usuario</option>
+
+              {usuarios.map((user) => (
+                <option value={user.nombre} key={user.nombre}>
+                  {user.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="form-field">
+            <span>
+              <LogIn size={17} />
+              Contraseña
+            </span>
+
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                setError("");
+              }}
+              autoComplete="current-password"
+            />
+          </label>
+
+          {error && (
+            <div
+              style={{
+                padding: "11px 12px",
+                borderRadius: "10px",
+                background: "#fff1f2",
+                color: "#be123c",
+                fontSize: "12px",
+                fontWeight: 700,
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="primary-button"
+            disabled={!selectedUser || !password}
+          >
+            <LogIn size={18} />
+            Iniciar sesión
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -1005,25 +1251,13 @@ function NewGembaForm({
                 Auditor
               </span>
 
-              <select
+              <input
+                type="text"
                 name="auditor"
-                value={
-                  gembaData.auditor
-                }
-                onChange={onChange}
-              >
-                <option value="Pablo Hernández">
-                  Pablo Hernández
-                </option>
-
-                <option value="José Suruy">
-                  José Suruy
-                </option>
-
-                <option value="Ricardo Estrada">
-                  Ricardo Estrada
-                </option>
-              </select>
+                value={gembaData.auditor}
+                readOnly
+                disabled
+              />
             </label>
           </div>
 
