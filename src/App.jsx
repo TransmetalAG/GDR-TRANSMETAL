@@ -24,6 +24,7 @@ import { colaboradores } from "./data/CatalogoColaboradores.js";
 
 import Seguridad from "./modules/Seguridad.jsx";
 import Calidad from "./modules/Calidad.jsx";
+import Proceso from "./modules/Proceso.jsx";
 
 function App() {
   const [currentPage, setCurrentPage] = useState("dashboard");
@@ -196,13 +197,12 @@ function App() {
   }
 
   function handleOpenModule(moduleId) {
-    if (moduleId === "seguridad") {
-      setActiveGembaModule("seguridad");
-      return;
-    }
-
-    if (moduleId === "calidad") {
-      setActiveGembaModule("calidad");
+    if (
+      moduleId === "seguridad" ||
+      moduleId === "calidad" ||
+      moduleId === "proceso"
+    ) {
+      setActiveGembaModule(moduleId);
       return;
     }
 
@@ -226,6 +226,15 @@ function App() {
     setModuleResults((previous) => ({
       ...previous,
       calidad: result,
+    }));
+
+    setActiveGembaModule(null);
+  }
+
+  function handleCompleteProcess(result) {
+    setModuleResults((previous) => ({
+      ...previous,
+      proceso: result,
     }));
 
     setActiveGembaModule(null);
@@ -337,6 +346,16 @@ function App() {
               gembaData={gembaData}
               onBack={() => setActiveGembaModule(null)}
               onComplete={handleCompleteQuality}
+            />
+          )}
+
+        {currentPage === "nuevo-gemba" &&
+          gembaStarted &&
+          activeGembaModule === "proceso" && (
+            <Proceso
+              gembaData={gembaData}
+              onBack={() => setActiveGembaModule(null)}
+              onComplete={handleCompleteProcess}
             />
           )}
 
