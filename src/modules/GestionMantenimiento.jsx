@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Pencil,
   X,
+  Trash2,
 } from "lucide-react";
 
 import { catalogo } from "../data/CatalogoMaquinas.js";
@@ -481,6 +482,35 @@ function GestionMantenimiento() {
       ...previous,
       [tecnico]: horas,
     }));
+  }
+
+  async function eliminarTarea(tarea) {
+    const confirmar = window.confirm(
+      `¿Seguro que deseás eliminar esta tarea de mantenimiento?\n\n${tarea.equipo} — ${tarea.tarea}\n\nEsta acción no se puede deshacer.`
+    );
+
+    if (!confirmar) return;
+
+    const { error } = await supabase
+      .from("mantenimiento")
+      .delete()
+      .eq("id", tarea.id)
+      .eq("tipo_registro", "tarea");
+
+    if (error) {
+      console.error("Error al eliminar tarea:", error);
+      alert(`No se pudo eliminar la tarea.\n\n${error.message}`);
+      return;
+    }
+
+    setTareas((previous) =>
+      previous.filter((item) => item.id !== tarea.id)
+    );
+
+    if (modoEdicion === tarea.id) {
+      limpiarFormulario();
+      setMostrarFormulario(false);
+    }
   }
 
   return (
@@ -1190,16 +1220,35 @@ function GestionMantenimiento() {
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => editarTarea(tarea)}
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "8px",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
                     >
-                      <Pencil size={16} />
-                      {tarea.estado === "Pendiente de asignación"
-                        ? "Planificar"
-                        : "Editar"}
-                    </button>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => editarTarea(tarea)}
+                      >
+                        <Pencil size={16} />
+                        {tarea.estado === "Pendiente de asignación"
+                          ? "Planificar"
+                          : "Editar"}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="icon-delete-button"
+                        onClick={() => eliminarTarea(tarea)}
+                        title="Eliminar tarea"
+                        aria-label={`Eliminar tarea ${tarea.tarea}`}
+                      >
+                        <Trash2 size={17} />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="finding-tags">
