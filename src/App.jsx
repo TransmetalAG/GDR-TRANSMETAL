@@ -29,6 +29,7 @@ import Calidad from "./modules/Calidad.jsx";
 import Proceso from "./modules/Proceso.jsx";
 import Mantenimiento from "./modules/Mantenimiento.jsx";
 import GestionMantenimiento from "./modules/GestionMantenimiento.jsx";
+import PlanAccion from "./modules/PlanAccion.jsx";
 
 import ResumenGemba from "./components/ResumenGemba.jsx";
 import { supabase } from "./lib/supabase.js";
@@ -813,11 +814,7 @@ function App() {
 
         {currentPage ===
           "plan-accion" && (
-          <PlaceholderPage
-            title="Plan de Acción"
-            text="Aquí se consolidarán las acciones generadas durante los Gemba Walks."
-            Icon={ClipboardList}
-          />
+          <PlanAccion />
         )}
 
         {currentPage ===
