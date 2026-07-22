@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Wrench,
   Plus,
@@ -10,22 +10,95 @@ import {
   Filter,
   CheckCircle2,
   AlertTriangle,
-  PlayCircle,
   ClipboardList,
+  Save,
+  Pencil,
+  X,
 } from "lucide-react";
 
 import { catalogo } from "../data/CatalogoMaquinas.js";
+import { supabase } from "../lib/supabase.js";
+
+const TECNICOS = [
+  "Edvin Telles",
+  "Carlos Carcuz",
+  "Erwin Haz",
+  "Anderson López",
+];
+
+const CAPACIDAD_DEFAULT = 40;
+const PORCENTAJE_PROGRAMABLE = 0.8;
+
+function toDateString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getMonday(dateValue = new Date()) {
+  const date =
+    typeof dateValue === "string"
+      ? new Date(`${dateValue}T12:00:00`)
+      : new Date(dateValue);
+
+  const day = date.getDay();
+  const difference = day === 0 ? -6 : 1 - day;
+
+  date.setDate(date.getDate() + difference);
+  date.setHours(12, 0, 0, 0);
+
+  return toDateString(date);
+}
+
+function addDays(dateString, days) {
+  const date = new Date(`${dateString}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return toDateString(date);
+}
+
+function formatDate(dateString) {
+  if (!dateString) return "Sin programar";
+
+  return new Intl.DateTimeFormat("es-GT", {
+    dateStyle: "medium",
+  }).format(new Date(`${dateString}T12:00:00`));
+}
+
+function normalizarTarea(row) {
+  return {
+    id: row.id,
+    equipo: row.equipo || "",
+    tarea: row.tarea || "",
+    responsable: row.responsable || "",
+    diaProgramado: row.dia_programado || "",
+    tiempoEstimado:
+      row.tiempo_estimado_horas !== null &&
+      row.tiempo_estimado_horas !== undefined
+        ? Number(row.tiempo_estimado_horas)
+        : "",
+    prioridad: row.prioridad || "Media",
+    estado: row.estado || "Pendiente de asignación",
+    origen: row.origen || "Manual",
+    gembaId: row.gemba_id || null,
+    observaciones: row.observaciones || "",
+    createdAt: row.created_at || null,
+  };
+}
 
 function GestionMantenimiento() {
-  const tecnicos = [
-    "Edvin Telles",
-    "Carlos Carcuz",
-    "Erwin Haz",
-    "Anderson López",
-  ];
+  const [loading, setLoading] = useState(true);
+  const [guardando, setGuardando] = useState(false);
 
-  const [mostrarFormulario, setMostrarFormulario] =
-    useState(false);
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [modoEdicion, setModoEdicion] = useState(null);
+
+  const [semanaSeleccionada, setSemanaSeleccionada] = useState(
+    getMonday(new Date())
+  );
+
+  const [tareas, setTareas] = useState([]);
+  const [capacidades, setCapacidades] = useState({});
 
   const [filtros, setFiltros] = useState({
     responsable: "",
@@ -42,66 +115,139 @@ function GestionMantenimiento() {
     diaProgramado: "",
     tiempoEstimado: "",
     prioridad: "Media",
+    observaciones: "",
   });
 
-  /*
-    Por ahora usamos datos temporales únicamente
-    para construir y validar la interfaz.
-
-    Después conectaremos esta pantalla con Supabase.
-  */
-  const [tareas, setTareas] = useState([
-    {
-      id: 1,
-      equipo: "Caiman",
-      tarea: "Revisar fuga de aceite en sistema hidráulico.",
-      responsable: "Edvin Telles",
-      diaProgramado: "2026-07-23",
-      tiempoEstimado: "2 horas",
-      prioridad: "Alta",
-      estado: "Asignada",
-      origen: "Gemba",
-    },
-    {
-      id: 2,
-      equipo: "Troqueladora 3",
-      tarea: "Revisar ruido anormal durante operación.",
-      responsable: "Carlos Carcuz",
-      diaProgramado: "2026-07-24",
-      tiempoEstimado: "1 hora",
-      prioridad: "Media",
-      estado: "En proceso",
-      origen: "Manual",
-    },
-    {
-      id: 3,
-      equipo: "Pintura Electroestatica",
-      tarea: "Inspección preventiva de ventiladores.",
-      responsable: "Erwin Haz",
-      diaProgramado: "2026-07-25",
-      tiempoEstimado: "3 horas",
-      prioridad: "Baja",
-      estado: "Terminada",
-      origen: "Manual",
-    },
-  ]);
-
   const maquinas = useMemo(() => {
-    return [
-      ...new Set(
-        catalogo.map((item) => item.maquina)
-      ),
-    ].sort((a, b) =>
+    return [...new Set(catalogo.map((item) => item.maquina))].sort((a, b) =>
       a.localeCompare(b, "es")
     );
   }, []);
+
+  useEffect(() => {
+    cargarDatos();
+  }, []);
+
+  async function cargarDatos() {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("mantenimiento")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error al cargar mantenimiento:", error);
+      alert(`No se pudo cargar la gestión de mantenimiento.\n\n${error.message}`);
+      setLoading(false);
+      return;
+    }
+
+    const registros = data || [];
+
+    const tareasDb = registros
+      .filter((row) => row.tipo_registro === "tarea")
+      .map(normalizarTarea);
+
+    const capacidadesDb = {};
+
+    registros
+      .filter((row) => row.tipo_registro === "capacidad")
+      .forEach((row) => {
+        const key = `${row.responsable}__${row.semana_inicio}`;
+
+        capacidadesDb[key] = {
+          id: row.id,
+          responsable: row.responsable,
+          semanaInicio: row.semana_inicio,
+          horasDisponibles: Number(row.horas_disponibles || CAPACIDAD_DEFAULT),
+        };
+      });
+
+    setTareas(tareasDb);
+    setCapacidades(capacidadesDb);
+    setLoading(false);
+  }
+
+  function getCapacidadKey(responsable, semanaInicio) {
+    return `${responsable}__${semanaInicio}`;
+  }
+
+  function getHorasDisponibles(responsable, semanaInicio) {
+    const key = getCapacidadKey(responsable, semanaInicio);
+
+    return (
+      capacidades[key]?.horasDisponibles ??
+      CAPACIDAD_DEFAULT
+    );
+  }
+
+  function getHorasProgramadas(responsable, semanaInicio, excludeTaskId = null) {
+    const finSemana = addDays(semanaInicio, 6);
+
+    return tareas
+      .filter((tarea) => {
+        if (!tarea.diaProgramado) return false;
+        if (tarea.id === excludeTaskId) return false;
+        if (tarea.responsable !== responsable) return false;
+
+        return (
+          tarea.diaProgramado >= semanaInicio &&
+          tarea.diaProgramado <= finSemana
+        );
+      })
+      .reduce(
+        (sum, tarea) => sum + Number(tarea.tiempoEstimado || 0),
+        0
+      );
+  }
+
+  const resumenCapacidad = useMemo(() => {
+    return TECNICOS.map((tecnico) => {
+      const horasDisponibles = getHorasDisponibles(
+        tecnico,
+        semanaSeleccionada
+      );
+
+      const maximoProgramable =
+        horasDisponibles * PORCENTAJE_PROGRAMABLE;
+
+      const reservaCorrectiva =
+        horasDisponibles - maximoProgramable;
+
+      const horasProgramadas = getHorasProgramadas(
+        tecnico,
+        semanaSeleccionada
+      );
+
+      const disponibleProgramable = Math.max(
+        0,
+        maximoProgramable - horasProgramadas
+      );
+
+      const porcentajeProgramado =
+        horasDisponibles > 0
+          ? (horasProgramadas / horasDisponibles) * 100
+          : 0;
+
+      return {
+        tecnico,
+        horasDisponibles,
+        maximoProgramable,
+        reservaCorrectiva,
+        horasProgramadas,
+        disponibleProgramable,
+        porcentajeProgramado,
+        sobreProgramado: horasProgramadas > maximoProgramable,
+      };
+    });
+  }, [capacidades, tareas, semanaSeleccionada]);
 
   const tareasFiltradas = useMemo(() => {
     return tareas.filter((tarea) => {
       const coincideResponsable =
         !filtros.responsable ||
-        tarea.responsable ===
-          filtros.responsable;
+        tarea.responsable === filtros.responsable;
 
       const coincideEstado =
         !filtros.estado ||
@@ -109,26 +255,18 @@ function GestionMantenimiento() {
 
       const coincidePrioridad =
         !filtros.prioridad ||
-        tarea.prioridad ===
-          filtros.prioridad;
+        tarea.prioridad === filtros.prioridad;
 
       const coincideEquipo =
         !filtros.equipo ||
         tarea.equipo === filtros.equipo;
 
-      const textoBusqueda =
-        filtros.busqueda
-          .trim()
-          .toLowerCase();
+      const textoBusqueda = filtros.busqueda.trim().toLowerCase();
 
       const coincideBusqueda =
         !textoBusqueda ||
-        tarea.tarea
-          .toLowerCase()
-          .includes(textoBusqueda) ||
-        tarea.equipo
-          .toLowerCase()
-          .includes(textoBusqueda);
+        tarea.tarea.toLowerCase().includes(textoBusqueda) ||
+        tarea.equipo.toLowerCase().includes(textoBusqueda);
 
       return (
         coincideResponsable &&
@@ -143,24 +281,19 @@ function GestionMantenimiento() {
   const indicadores = useMemo(() => {
     return {
       pendientes: tareas.filter(
-        (tarea) =>
-          tarea.estado ===
-          "Pendiente de asignación"
+        (tarea) => tarea.estado === "Pendiente de asignación"
       ).length,
 
       asignadas: tareas.filter(
-        (tarea) =>
-          tarea.estado === "Asignada"
+        (tarea) => tarea.estado === "Asignada"
       ).length,
 
       enProceso: tareas.filter(
-        (tarea) =>
-          tarea.estado === "En proceso"
+        (tarea) => tarea.estado === "En proceso"
       ).length,
 
       terminadas: tareas.filter(
-        (tarea) =>
-          tarea.estado === "Terminada"
+        (tarea) => tarea.estado === "Terminada"
       ).length,
     };
   }, [tareas]);
@@ -191,90 +324,233 @@ function GestionMantenimiento() {
       diaProgramado: "",
       tiempoEstimado: "",
       prioridad: "Media",
+      observaciones: "",
+    });
+
+    setModoEdicion(null);
+  }
+
+  function abrirNuevaTarea() {
+    limpiarFormulario();
+    setMostrarFormulario(true);
+  }
+
+  function editarTarea(tarea) {
+    setModoEdicion(tarea.id);
+
+    setNuevaTarea({
+      equipo: tarea.equipo,
+      tarea: tarea.tarea,
+      responsable: tarea.responsable,
+      diaProgramado: tarea.diaProgramado,
+      tiempoEstimado:
+        tarea.tiempoEstimado === "" ? "" : String(tarea.tiempoEstimado),
+      prioridad: tarea.prioridad,
+      observaciones: tarea.observaciones || "",
+    });
+
+    setMostrarFormulario(true);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
     });
   }
 
-  function guardarNuevaTarea(event) {
+  function validarCargaSemanal() {
+    if (
+      !nuevaTarea.responsable ||
+      !nuevaTarea.diaProgramado ||
+      !nuevaTarea.tiempoEstimado
+    ) {
+      return true;
+    }
+
+    const horasTarea = Number(nuevaTarea.tiempoEstimado);
+
+    if (!Number.isFinite(horasTarea) || horasTarea <= 0) {
+      return true;
+    }
+
+    const semanaInicio = getMonday(nuevaTarea.diaProgramado);
+
+    const horasDisponibles = getHorasDisponibles(
+      nuevaTarea.responsable,
+      semanaInicio
+    );
+
+    const maximoProgramable =
+      horasDisponibles * PORCENTAJE_PROGRAMABLE;
+
+    const horasProgramadas = getHorasProgramadas(
+      nuevaTarea.responsable,
+      semanaInicio,
+      modoEdicion
+    );
+
+    const totalProyectado = horasProgramadas + horasTarea;
+
+    if (totalProyectado <= maximoProgramable) {
+      return true;
+    }
+
+    const porcentaje =
+      horasDisponibles > 0
+        ? (totalProyectado / horasDisponibles) * 100
+        : 0;
+
+    return window.confirm(
+      `${nuevaTarea.responsable} quedaría con ${totalProyectado.toFixed(
+        1
+      )} h programadas (${porcentaje.toFixed(
+        1
+      )}% de su capacidad semanal).\n\n` +
+        `El objetivo máximo programable es ${maximoProgramable.toFixed(
+          1
+        )} h (80%), dejando 20% para correctivos.\n\n` +
+        "¿Deseás guardar la tarea de todas formas?"
+    );
+  }
+
+  async function guardarNuevaTarea(event) {
     event.preventDefault();
 
     if (!nuevaTarea.equipo) {
-      alert(
-        "Seleccioná el equipo a intervenir."
-      );
+      alert("Seleccioná el equipo a intervenir.");
       return;
     }
 
     if (!nuevaTarea.tarea.trim()) {
-      alert(
-        "Describí la tarea de mantenimiento."
-      );
+      alert("Describí la tarea de mantenimiento.");
       return;
     }
 
     if (!nuevaTarea.responsable) {
-      alert(
-        "Seleccioná un responsable."
-      );
+      alert("Seleccioná un responsable.");
       return;
     }
 
     if (!nuevaTarea.diaProgramado) {
-      alert(
-        "Seleccioná el día programado."
-      );
+      alert("Seleccioná el día programado.");
       return;
     }
 
-    if (
-      !nuevaTarea.tiempoEstimado.trim()
-    ) {
-      alert(
-        "Indicá el tiempo estimado."
-      );
+    const horas = Number(nuevaTarea.tiempoEstimado);
+
+    if (!Number.isFinite(horas) || horas <= 0) {
+      alert("Ingresá un tiempo estimado válido en horas.");
       return;
     }
 
-    const tarea = {
-      id: Date.now(),
+    if (!validarCargaSemanal()) {
+      return;
+    }
+
+    setGuardando(true);
+
+    const payload = {
+      tipo_registro: "tarea",
       equipo: nuevaTarea.equipo,
-      tarea:
-        nuevaTarea.tarea.trim(),
-      responsable:
-        nuevaTarea.responsable,
-      diaProgramado:
-        nuevaTarea.diaProgramado,
-      tiempoEstimado:
-        nuevaTarea.tiempoEstimado.trim(),
-      prioridad:
-        nuevaTarea.prioridad,
+      tarea: nuevaTarea.tarea.trim(),
+      responsable: nuevaTarea.responsable,
+      dia_programado: nuevaTarea.diaProgramado,
+      tiempo_estimado_horas: horas,
+      prioridad: nuevaTarea.prioridad,
       estado: "Asignada",
-      origen: "Manual",
+      origen: modoEdicion
+        ? tareas.find((item) => item.id === modoEdicion)?.origen || "Manual"
+        : "Manual",
+      observaciones: nuevaTarea.observaciones.trim() || null,
     };
 
-    setTareas((previous) => [
-      tarea,
-      ...previous,
-    ]);
+    let error;
+
+    if (modoEdicion) {
+      const response = await supabase
+        .from("mantenimiento")
+        .update(payload)
+        .eq("id", modoEdicion);
+
+      error = response.error;
+    } else {
+      const response = await supabase
+        .from("mantenimiento")
+        .insert(payload);
+
+      error = response.error;
+    }
+
+    if (error) {
+      console.error("Error al guardar tarea:", error);
+      alert(`No se pudo guardar la tarea.\n\n${error.message}`);
+      setGuardando(false);
+      return;
+    }
 
     limpiarFormulario();
-
     setMostrarFormulario(false);
+    setGuardando(false);
+
+    await cargarDatos();
   }
 
-  function cambiarEstado(
-    tareaId,
-    nuevoEstado
-  ) {
-    setTareas((previous) =>
-      previous.map((tarea) =>
-        tarea.id === tareaId
-          ? {
-              ...tarea,
-              estado: nuevoEstado,
-            }
-          : tarea
-      )
-    );
+  async function guardarCapacidad(tecnico, horasDisponibles) {
+    const horas = Number(horasDisponibles);
+
+    if (!Number.isFinite(horas) || horas < 0) {
+      alert("Ingresá una capacidad semanal válida.");
+      return;
+    }
+
+    const key = getCapacidadKey(tecnico, semanaSeleccionada);
+    const registroExistente = capacidades[key];
+
+    const payload = {
+      tipo_registro: "capacidad",
+      responsable: tecnico,
+      semana_inicio: semanaSeleccionada,
+      horas_disponibles: horas,
+    };
+
+    let error;
+
+    if (registroExistente?.id) {
+      const response = await supabase
+        .from("mantenimiento")
+        .update(payload)
+        .eq("id", registroExistente.id);
+
+      error = response.error;
+    } else {
+      const response = await supabase
+        .from("mantenimiento")
+        .insert(payload);
+
+      error = response.error;
+    }
+
+    if (error) {
+      console.error("Error al guardar capacidad:", error);
+      alert(`No se pudo guardar la capacidad.\n\n${error.message}`);
+      return;
+    }
+
+    await cargarDatos();
+  }
+
+  function actualizarCapacidadLocal(tecnico, value) {
+    const key = getCapacidadKey(tecnico, semanaSeleccionada);
+    const horas = value === "" ? "" : Number(value);
+
+    setCapacidades((previous) => ({
+      ...previous,
+      [key]: {
+        ...(previous[key] || {}),
+        responsable: tecnico,
+        semanaInicio: semanaSeleccionada,
+        horasDisponibles: horas,
+      },
+    }));
   }
 
   return (
@@ -290,24 +566,206 @@ function GestionMantenimiento() {
           </h2>
 
           <p>
-            Planificá, asigná y controlá
-            las tareas de mantenimiento
-            provenientes de Gemba o
-            generadas manualmente.
+            Planificá, asigná y controlá las tareas de mantenimiento
+            provenientes de Gemba o generadas manualmente.
           </p>
         </div>
 
         <button
           type="button"
           className="primary-button"
-          onClick={() =>
-            setMostrarFormulario(true)
-          }
+          onClick={abrirNuevaTarea}
         >
           <Plus size={19} />
           Nueva tarea
         </button>
       </header>
+
+      <section
+        className="section-block"
+        style={{ marginBottom: "22px" }}
+      >
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">
+              Capacidad semanal
+            </span>
+
+            <h3>
+              Programación por técnico
+            </h3>
+          </div>
+
+          <label
+            className="form-field"
+            style={{ minWidth: "220px" }}
+          >
+            <span>
+              <CalendarDays size={17} />
+              Semana
+            </span>
+
+            <input
+              type="date"
+              value={semanaSeleccionada}
+              onChange={(event) =>
+                setSemanaSeleccionada(getMonday(event.target.value))
+              }
+            />
+          </label>
+        </div>
+
+        <div className="kpi-grid">
+          {resumenCapacidad.map((item) => {
+            const key = getCapacidadKey(
+              item.tecnico,
+              semanaSeleccionada
+            );
+
+            const valorEditable =
+              capacidades[key]?.horasDisponibles ??
+              CAPACIDAD_DEFAULT;
+
+            return (
+              <article
+                className="kpi-card"
+                key={item.tecnico}
+              >
+                <span>
+                  {item.tecnico}
+                </span>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    alignItems: "end",
+                    marginTop: "12px",
+                  }}
+                >
+                  <label
+                    className="form-field"
+                    style={{ flex: 1 }}
+                  >
+                    <span>
+                      Capacidad semanal
+                    </span>
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={valorEditable}
+                      onChange={(event) =>
+                        actualizarCapacidadLocal(
+                          item.tecnico,
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() =>
+                      guardarCapacidad(
+                        item.tecnico,
+                        valorEditable
+                      )
+                    }
+                    title="Guardar capacidad"
+                    style={{
+                      minWidth: "44px",
+                      padding: "12px",
+                    }}
+                  >
+                    <Save size={17} />
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "14px",
+                    display: "grid",
+                    gap: "6px",
+                    fontSize: "12px",
+                    color: "#667085",
+                  }}
+                >
+                  <span>
+                    Programado:{" "}
+                    <strong>
+                      {item.horasProgramadas.toFixed(1)} h
+                    </strong>
+                  </span>
+
+                  <span>
+                    Máximo 80%:{" "}
+                    <strong>
+                      {item.maximoProgramable.toFixed(1)} h
+                    </strong>
+                  </span>
+
+                  <span>
+                    Disponible para programar:{" "}
+                    <strong>
+                      {item.disponibleProgramable.toFixed(1)} h
+                    </strong>
+                  </span>
+
+                  <span>
+                    Reserva correctiva 20%:{" "}
+                    <strong>
+                      {item.reservaCorrectiva.toFixed(1)} h
+                    </strong>
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "14px",
+                    height: "8px",
+                    borderRadius: "999px",
+                    background: "#eef2f7",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        item.porcentajeProgramado
+                      )}%`,
+                      height: "100%",
+                      background: item.sobreProgramado
+                        ? "#e11d48"
+                        : "#2563eb",
+                    }}
+                  />
+                </div>
+
+                <small
+                  style={{
+                    marginTop: "8px",
+                    color: item.sobreProgramado
+                      ? "#be123c"
+                      : "#98a2b3",
+                  }}
+                >
+                  {item.sobreProgramado
+                    ? `⚠ ${item.porcentajeProgramado.toFixed(
+                        1
+                      )}% programado`
+                    : `${item.porcentajeProgramado.toFixed(
+                        1
+                      )}% programado`}
+                </small>
+              </article>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="kpi-grid">
         <div className="kpi-card">
@@ -320,7 +778,7 @@ function GestionMantenimiento() {
           </strong>
 
           <small>
-            Sin responsable asignado
+            Sin planificación completa
           </small>
         </div>
 
@@ -377,23 +835,32 @@ function GestionMantenimiento() {
           <div className="section-heading">
             <div>
               <span className="eyebrow">
-                Nueva intervención
+                {modoEdicion
+                  ? "Planificación"
+                  : "Nueva intervención"}
               </span>
 
               <h3>
-                Crear tarea de mantenimiento
+                {modoEdicion
+                  ? "Editar / planificar tarea"
+                  : "Crear tarea de mantenimiento"}
               </h3>
             </div>
 
-            <p>
-              Registrá la planificación
-              inicial de la intervención.
-            </p>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
+                limpiarFormulario();
+                setMostrarFormulario(false);
+              }}
+            >
+              <X size={17} />
+              Cerrar
+            </button>
           </div>
 
-          <form
-            onSubmit={guardarNuevaTarea}
-          >
+          <form onSubmit={guardarNuevaTarea}>
             <div className="form-grid">
               <label className="form-field">
                 <span>
@@ -403,27 +870,21 @@ function GestionMantenimiento() {
 
                 <select
                   name="equipo"
-                  value={
-                    nuevaTarea.equipo
-                  }
-                  onChange={
-                    handleNuevaTareaChange
-                  }
+                  value={nuevaTarea.equipo}
+                  onChange={handleNuevaTareaChange}
                 >
                   <option value="">
                     Seleccionar equipo
                   </option>
 
-                  {maquinas.map(
-                    (maquina) => (
-                      <option
-                        key={maquina}
-                        value={maquina}
-                      >
-                        {maquina}
-                      </option>
-                    )
-                  )}
+                  {maquinas.map((maquina) => (
+                    <option
+                      key={maquina}
+                      value={maquina}
+                    >
+                      {maquina}
+                    </option>
+                  ))}
                 </select>
               </label>
 
@@ -435,27 +896,21 @@ function GestionMantenimiento() {
 
                 <select
                   name="responsable"
-                  value={
-                    nuevaTarea.responsable
-                  }
-                  onChange={
-                    handleNuevaTareaChange
-                  }
+                  value={nuevaTarea.responsable}
+                  onChange={handleNuevaTareaChange}
                 >
                   <option value="">
                     Seleccionar responsable
                   </option>
 
-                  {tecnicos.map(
-                    (tecnico) => (
-                      <option
-                        key={tecnico}
-                        value={tecnico}
-                      >
-                        {tecnico}
-                      </option>
-                    )
-                  )}
+                  {TECNICOS.map((tecnico) => (
+                    <option
+                      key={tecnico}
+                      value={tecnico}
+                    >
+                      {tecnico}
+                    </option>
+                  ))}
                 </select>
               </label>
 
@@ -468,31 +923,25 @@ function GestionMantenimiento() {
                 <input
                   type="date"
                   name="diaProgramado"
-                  value={
-                    nuevaTarea.diaProgramado
-                  }
-                  onChange={
-                    handleNuevaTareaChange
-                  }
+                  value={nuevaTarea.diaProgramado}
+                  onChange={handleNuevaTareaChange}
                 />
               </label>
 
               <label className="form-field">
                 <span>
                   <Clock3 size={17} />
-                  Tiempo estimado
+                  Tiempo estimado (horas)
                 </span>
 
                 <input
-                  type="text"
+                  type="number"
+                  min="0.5"
+                  step="0.5"
                   name="tiempoEstimado"
-                  value={
-                    nuevaTarea.tiempoEstimado
-                  }
-                  onChange={
-                    handleNuevaTareaChange
-                  }
-                  placeholder="Ej. 2 horas"
+                  value={nuevaTarea.tiempoEstimado}
+                  onChange={handleNuevaTareaChange}
+                  placeholder="Ej. 2"
                 />
               </label>
 
@@ -504,12 +953,8 @@ function GestionMantenimiento() {
 
                 <select
                   name="prioridad"
-                  value={
-                    nuevaTarea.prioridad
-                  }
-                  onChange={
-                    handleNuevaTareaChange
-                  }
+                  value={nuevaTarea.prioridad}
+                  onChange={handleNuevaTareaChange}
                 >
                   <option value="Baja">
                     Baja
@@ -538,13 +983,23 @@ function GestionMantenimiento() {
                 <textarea
                   rows="4"
                   name="tarea"
-                  value={
-                    nuevaTarea.tarea
-                  }
-                  onChange={
-                    handleNuevaTareaChange
-                  }
+                  value={nuevaTarea.tarea}
+                  onChange={handleNuevaTareaChange}
                   placeholder="Describí claramente la intervención requerida."
+                />
+              </label>
+
+              <label className="form-field form-field-full">
+                <span>
+                  <ClipboardList size={17} />
+                  Observaciones de planificación
+                </span>
+
+                <textarea
+                  rows="3"
+                  name="observaciones"
+                  value={nuevaTarea.observaciones}
+                  onChange={handleNuevaTareaChange}
                 />
               </label>
             </div>
@@ -564,11 +1019,14 @@ function GestionMantenimiento() {
               <button
                 type="submit"
                 className="primary-button"
+                disabled={guardando}
               >
-                <CheckCircle2
-                  size={18}
-                />
-                Crear tarea
+                <CheckCircle2 size={18} />
+                {guardando
+                  ? "Guardando..."
+                  : modoEdicion
+                    ? "Guardar planificación"
+                    : "Crear tarea"}
               </button>
             </div>
           </form>
@@ -588,8 +1046,7 @@ function GestionMantenimiento() {
           </div>
 
           <p>
-            Filtrá por responsable,
-            estado, prioridad o equipo.
+            Filtrá por responsable, estado, prioridad o equipo.
           </p>
         </div>
 
@@ -608,12 +1065,8 @@ function GestionMantenimiento() {
             <input
               type="text"
               name="busqueda"
-              value={
-                filtros.busqueda
-              }
-              onChange={
-                handleFiltroChange
-              }
+              value={filtros.busqueda}
+              onChange={handleFiltroChange}
               placeholder="Buscar equipo o tarea"
             />
           </label>
@@ -626,27 +1079,21 @@ function GestionMantenimiento() {
 
             <select
               name="responsable"
-              value={
-                filtros.responsable
-              }
-              onChange={
-                handleFiltroChange
-              }
+              value={filtros.responsable}
+              onChange={handleFiltroChange}
             >
               <option value="">
                 Todos
               </option>
 
-              {tecnicos.map(
-                (tecnico) => (
-                  <option
-                    key={tecnico}
-                    value={tecnico}
-                  >
-                    {tecnico}
-                  </option>
-                )
-              )}
+              {TECNICOS.map((tecnico) => (
+                <option
+                  key={tecnico}
+                  value={tecnico}
+                >
+                  {tecnico}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -659,9 +1106,7 @@ function GestionMantenimiento() {
             <select
               name="estado"
               value={filtros.estado}
-              onChange={
-                handleFiltroChange
-              }
+              onChange={handleFiltroChange}
             >
               <option value="">
                 Todos
@@ -693,12 +1138,8 @@ function GestionMantenimiento() {
 
             <select
               name="prioridad"
-              value={
-                filtros.prioridad
-              }
-              onChange={
-                handleFiltroChange
-              }
+              value={filtros.prioridad}
+              onChange={handleFiltroChange}
             >
               <option value="">
                 Todas
@@ -730,32 +1171,38 @@ function GestionMantenimiento() {
 
             <select
               name="equipo"
-              value={
-                filtros.equipo
-              }
-              onChange={
-                handleFiltroChange
-              }
+              value={filtros.equipo}
+              onChange={handleFiltroChange}
             >
               <option value="">
                 Todos
               </option>
 
-              {maquinas.map(
-                (maquina) => (
-                  <option
-                    key={maquina}
-                    value={maquina}
-                  >
-                    {maquina}
-                  </option>
-                )
-              )}
+              {maquinas.map((maquina) => (
+                <option
+                  key={maquina}
+                  value={maquina}
+                >
+                  {maquina}
+                </option>
+              ))}
             </select>
           </label>
         </div>
 
-        {tareasFiltradas.length === 0 ? (
+        {loading ? (
+          <div
+            className="finding-entry-card"
+            style={{
+              textAlign: "center",
+              padding: "30px",
+            }}
+          >
+            <strong>
+              Cargando tareas...
+            </strong>
+          </div>
+        ) : tareasFiltradas.length === 0 ? (
           <div
             className="finding-entry-card"
             style={{
@@ -776,172 +1223,106 @@ function GestionMantenimiento() {
           </div>
         ) : (
           <div className="findings-list">
-            {tareasFiltradas.map(
-              (tarea) => (
-                <article
-                  key={tarea.id}
-                  className="finding-item"
-                >
-                  <div className="finding-index">
-                    <Wrench
-                      size={15}
-                    />
+            {tareasFiltradas.map((tarea) => (
+              <article
+                key={tarea.id}
+                className="finding-item"
+              >
+                <div className="finding-index">
+                  <Wrench size={15} />
+                </div>
+
+                <div className="finding-item-content">
+                  <div className="finding-item-top">
+                    <div>
+                      <p>
+                        <strong>
+                          {tarea.equipo}
+                        </strong>
+                      </p>
+
+                      <p>
+                        {tarea.tarea}
+                      </p>
+
+                      <p>
+                        <strong>
+                          Responsable:
+                        </strong>{" "}
+                        {tarea.responsable ||
+                          "Pendiente de asignación"}
+                      </p>
+
+                      <p>
+                        <strong>
+                          Día programado:
+                        </strong>{" "}
+                        {formatDate(tarea.diaProgramado)}
+                      </p>
+
+                      <p>
+                        <strong>
+                          Tiempo estimado:
+                        </strong>{" "}
+                        {tarea.tiempoEstimado !== ""
+                          ? `${tarea.tiempoEstimado} h`
+                          : "Sin definir"}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => editarTarea(tarea)}
+                    >
+                      <Pencil size={16} />
+                      {tarea.estado === "Pendiente de asignación"
+                        ? "Planificar"
+                        : "Editar"}
+                    </button>
                   </div>
 
-                  <div className="finding-item-content">
-                    <div className="finding-item-top">
-                      <div>
-                        <p>
-                          <strong>
-                            {tarea.equipo}
-                          </strong>
-                        </p>
+                  <div className="finding-tags">
+                    <span
+                      className={`criticality-tag ${
+                        tarea.prioridad === "Baja"
+                          ? "baja"
+                          : tarea.prioridad === "Media"
+                            ? "media"
+                            : tarea.prioridad === "Alta"
+                              ? "alta"
+                              : "crítica"
+                      }`}
+                    >
+                      {tarea.prioridad}
+                    </span>
 
-                        <p>
-                          {tarea.tarea}
-                        </p>
+                    <span className="maintenance-tag">
+                      {tarea.estado}
+                    </span>
 
-                        <p>
-                          <strong>
-                            Responsable:
-                          </strong>{" "}
-                          {
-                            tarea.responsable
-                          }
-                        </p>
+                    <span className="status-pill">
+                      Origen: {tarea.origen}
+                    </span>
+                  </div>
 
-                        <p>
-                          <strong>
-                            Día programado:
-                          </strong>{" "}
-                          {
-                            tarea.diaProgramado
-                          }
-                        </p>
-
-                        <p>
-                          <strong>
-                            Tiempo estimado:
-                          </strong>{" "}
-                          {
-                            tarea.tiempoEstimado
-                          }
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="finding-tags">
-                      <span
-                        className={`criticality-tag ${
-                          tarea.prioridad ===
-                          "Baja"
-                            ? "baja"
-                            : tarea.prioridad ===
-                                "Media"
-                              ? "media"
-                              : tarea.prioridad ===
-                                  "Alta"
-                                ? "alta"
-                                : "crítica"
-                        }`}
-                      >
-                        {
-                          tarea.prioridad
-                        }
-                      </span>
-
-                      <span className="maintenance-tag">
-                        {
-                          tarea.estado
-                        }
-                      </span>
-
-                      <span className="status-pill">
-                        Origen:{" "}
-                        {
-                          tarea.origen
-                        }
-                      </span>
-                    </div>
-
-                    <div
-                      className="finding-entry-actions"
+                  {tarea.observaciones && (
+                    <p
                       style={{
-                        justifyContent:
-                          "flex-start",
+                        marginTop: "12px",
+                        color: "#667085",
+                        fontSize: "12px",
                       }}
                     >
-                      {tarea.estado ===
-                        "Pendiente de asignación" && (
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          onClick={() =>
-                            cambiarEstado(
-                              tarea.id,
-                              "Asignada"
-                            )
-                          }
-                        >
-                          <ClipboardList
-                            size={17}
-                          />
-                          Marcar asignada
-                        </button>
-                      )}
-
-                      {tarea.estado ===
-                        "Asignada" && (
-                        <button
-                          type="button"
-                          className="primary-button"
-                          onClick={() =>
-                            cambiarEstado(
-                              tarea.id,
-                              "En proceso"
-                            )
-                          }
-                        >
-                          <PlayCircle
-                            size={17}
-                          />
-                          Iniciar tarea
-                        </button>
-                      )}
-
-                      {tarea.estado ===
-                        "En proceso" && (
-                        <button
-                          type="button"
-                          className="primary-button"
-                          onClick={() =>
-                            cambiarEstado(
-                              tarea.id,
-                              "Terminada"
-                            )
-                          }
-                        >
-                          <CheckCircle2
-                            size={17}
-                          />
-                          Finalizar tarea
-                        </button>
-                      )}
-
-                      {tarea.estado ===
-                        "Terminada" && (
-                        <span className="status-pill completed">
-                          <CheckCircle2
-                            size={14}
-                          />
-                          Trabajo terminado
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              )
-            )}
+                      <strong>
+                        Observaciones:
+                      </strong>{" "}
+                      {tarea.observaciones}
+                    </p>
+                  )}
+                </div>
+              </article>
+            ))}
           </div>
         )}
       </section>
