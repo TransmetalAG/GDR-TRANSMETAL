@@ -1,711 +1,107 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
-  LayoutDashboard,
-  Footprints,
-  ClipboardList,
-  Wrench,
-  ListTodo,
-  ShieldCheck,
-  Award,
-  Gauge,
-  Sparkles,
   ArrowLeft,
-  ArrowRight,
-  User,
-  Factory,
-  Hammer,
-  CalendarDays,
+  Gauge,
+  Plus,
+  Trash2,
+  Camera,
   CheckCircle2,
-  Workflow,
 } from "lucide-react";
 
-import { catalogo } from "./data/CatalogoMaquinas.js";
-import { colaboradores } from "./data/CatalogoColaboradores.js";
+function Proceso({ gembaData, onBack, onComplete }) {
+  const [existenDesperdicios, setExistenDesperdicios] = useState("");
+  const [hallazgos, setHallazgos] = useState([]);
 
-import Seguridad from "./modules/Seguridad.jsx";
-import Calidad from "./modules/Calidad.jsx";
-import Proceso from "./modules/Proceso.jsx";
-
-function App() {
-  const [currentPage, setCurrentPage] = useState("dashboard");
-  const [gembaStarted, setGembaStarted] = useState(false);
-  const [activeGembaModule, setActiveGembaModule] = useState(null);
-
-  const [gembaData, setGembaData] = useState({
-    maquina: "",
-    proceso: "",
-    collaborator: "",
-    task: "",
-    auditor: "Pablo Hernández",
+  const [nuevoHallazgo, setNuevoHallazgo] = useState({
+    tipo: "",
+    descripcion: "",
+    impacto: "Medio",
+    perdidaEstimada: "",
   });
 
-  const [moduleResults, setModuleResults] = useState({
-    seguridad: null,
-    calidad: null,
-    proceso: null,
-    mantenimiento: null,
-    "cinco-s": null,
-  });
-
-  const baseModules = [
-    {
-      id: "seguridad",
-      name: "Seguridad",
-      description: "Condiciones físicas, comportamiento y procedimientos",
-      icon: ShieldCheck,
-    },
-    {
-      id: "calidad",
-      name: "Calidad",
-      description: "Condición del producto y controles del proceso",
-      icon: Award,
-    },
-    {
-      id: "proceso",
-      name: "Proceso / Productividad",
-      description: "Desperdicios Lean y oportunidades de mejora",
-      icon: Gauge,
-    },
-    {
-      id: "mantenimiento",
-      name: "Mantenimiento",
-      description: "Detección y seguimiento de anomalías",
-      icon: Wrench,
-    },
-    {
-      id: "cinco-s",
-      name: "5S + Gestión Visual",
-      description: "Orden, limpieza, estándares y gestión visual",
-      icon: Sparkles,
-    },
+  const desperdiciosLean = [
+    "Sobreproducción",
+    "Espera",
+    "Transporte",
+    "Sobreprocesamiento",
+    "Inventario",
+    "Movimiento",
+    "Defectos",
+    "Talento no utilizado",
   ];
 
-  const modules = baseModules.map((module) => ({
-    ...module,
-    status: moduleResults[module.id] ? "Completado" : "Pendiente",
-  }));
+  function agregarHallazgo() {
+    if (!nuevoHallazgo.tipo) {
+      alert("Seleccioná el tipo de desperdicio.");
+      return;
+    }
 
-  const navigation = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "nuevo-gemba", label: "Nuevo Gemba", icon: Footprints },
-    { id: "plan-accion", label: "Plan de Acción", icon: ClipboardList },
-    { id: "mantenimiento", label: "Mantenimiento", icon: Wrench },
-    { id: "mis-tareas", label: "Mis tareas", icon: ListTodo },
-  ];
+    if (!nuevoHallazgo.descripcion.trim()) {
+      alert("Describí la oportunidad o desperdicio observado.");
+      return;
+    }
 
-  const maquinas = useMemo(() => {
-    return [...new Set(catalogo.map((item) => item.maquina))].sort();
-  }, []);
+    setHallazgos((previous) => [
+      ...previous,
+      {
+        id: Date.now(),
+        ...nuevoHallazgo,
+      },
+    ]);
 
-  const procesosDisponibles = useMemo(() => {
-    if (!gembaData.maquina) return [];
+    setNuevoHallazgo({
+      tipo: "",
+      descripcion: "",
+      impacto: "Medio",
+      perdidaEstimada: "",
+    });
+  }
 
-    return catalogo
-      .filter((item) => item.maquina === gembaData.maquina)
-      .map((item) => item.proceso);
-  }, [gembaData.maquina]);
-
-  const colaboradoresOrdenados = useMemo(() => {
-    return [...colaboradores].sort((a, b) =>
-      a.localeCompare(b, "es")
+  function eliminarHallazgo(id) {
+    setHallazgos((previous) =>
+      previous.filter((hallazgo) => hallazgo.id !== id)
     );
-  }, []);
+  }
 
-  const currentDate = new Intl.DateTimeFormat("es-GT", {
-    dateStyle: "long",
-    timeStyle: "short",
-  }).format(new Date());
-
-  const completedModules = Object.values(moduleResults).filter(Boolean).length;
-
-  function handleInputChange(event) {
-    const { name, value } = event.target;
-
-    if (name === "maquina") {
-      const procesos = catalogo
-        .filter((item) => item.maquina === value)
-        .map((item) => item.proceso);
-
-      setGembaData((previous) => ({
-        ...previous,
-        maquina: value,
-        proceso: procesos.length === 1 ? procesos[0] : "",
-      }));
-
+  function finalizarProceso() {
+    if (!existenDesperdicios) {
+      alert("Indicá si se observan desperdicios o pérdidas en el proceso.");
       return;
     }
 
-    setGembaData((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
-  }
-
-  function handleStartGemba(event) {
-    event.preventDefault();
-
-    if (
-      !gembaData.maquina ||
-      !gembaData.proceso ||
-      !gembaData.collaborator ||
-      !gembaData.task.trim() ||
-      !gembaData.auditor
-    ) {
-      alert("Completá todos los datos antes de iniciar el Gemba.");
+    if (existenDesperdicios === "si" && hallazgos.length === 0) {
+      alert("Agregá al menos un desperdicio u oportunidad.");
       return;
     }
 
-    setGembaStarted(true);
-    setActiveGembaModule(null);
-  }
-
-  function handleNewGemba() {
-    setCurrentPage("nuevo-gemba");
-    setGembaStarted(false);
-    setActiveGembaModule(null);
-
-    setModuleResults({
-      seguridad: null,
-      calidad: null,
-      proceso: null,
-      mantenimiento: null,
-      "cinco-s": null,
+    onComplete({
+      existenDesperdicios,
+      hallazgos,
     });
   }
 
-  function handleCancelGemba() {
-    setGembaStarted(false);
-    setActiveGembaModule(null);
-
-    setGembaData({
-      maquina: "",
-      proceso: "",
-      collaborator: "",
-      task: "",
-      auditor: "Pablo Hernández",
-    });
-
-    setModuleResults({
-      seguridad: null,
-      calidad: null,
-      proceso: null,
-      mantenimiento: null,
-      "cinco-s": null,
-    });
-
-    setCurrentPage("dashboard");
-  }
-
-  function handleOpenModule(moduleId) {
-    if (
-      moduleId === "seguridad" ||
-      moduleId === "calidad" ||
-      moduleId === "proceso"
-    ) {
-      setActiveGembaModule(moduleId);
-      return;
-    }
-
-    const moduleName =
-      baseModules.find((item) => item.id === moduleId)?.name ||
-      "Este módulo";
-
-    alert(`${moduleName} todavía no está construido.`);
-  }
-
-  function handleCompleteSafety(result) {
-    setModuleResults((previous) => ({
-      ...previous,
-      seguridad: result,
-    }));
-
-    setActiveGembaModule(null);
-  }
-
-  function handleCompleteQuality(result) {
-    setModuleResults((previous) => ({
-      ...previous,
-      calidad: result,
-    }));
-
-    setActiveGembaModule(null);
-  }
-
-  function handleCompleteProcess(result) {
-    setModuleResults((previous) => ({
-      ...previous,
-      proceso: result,
-    }));
-
-    setActiveGembaModule(null);
-  }
-
-  return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-icon">
-            <Footprints size={24} />
-          </div>
-
-          <div>
-            <h1>GDR Gemba</h1>
-            <span>Gestión de Rutina</span>
-          </div>
-        </div>
-
-        <nav className="navigation">
-          {navigation.map((item) => {
-            const Icon = item.icon;
-
-            return (
-              <button
-                key={item.id}
-                className={
-                  currentPage === item.id
-                    ? "nav-button active"
-                    : "nav-button"
-                }
-                onClick={() => {
-                  setCurrentPage(item.id);
-
-                  if (item.id === "nuevo-gemba") {
-                    setGembaStarted(false);
-                    setActiveGembaModule(null);
-                  }
-                }}
-              >
-                <Icon size={20} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="sidebar-user">
-          <div className="avatar">PH</div>
-
-          <div>
-            <strong>Pablo Hernández</strong>
-            <span>Auditor / Producción</span>
-          </div>
-        </div>
-      </aside>
-
-      <main className="main-content">
-        {currentPage === "dashboard" && (
-          <Dashboard
-            modules={modules}
-            onNewGemba={handleNewGemba}
-          />
-        )}
-
-        {currentPage === "nuevo-gemba" &&
-          !gembaStarted &&
-          !activeGembaModule && (
-            <NewGembaForm
-              gembaData={gembaData}
-              maquinas={maquinas}
-              procesosDisponibles={procesosDisponibles}
-              colaboradores={colaboradoresOrdenados}
-              currentDate={currentDate}
-              onChange={handleInputChange}
-              onSubmit={handleStartGemba}
-              onCancel={() => setCurrentPage("dashboard")}
-            />
-          )}
-
-        {currentPage === "nuevo-gemba" &&
-          gembaStarted &&
-          !activeGembaModule && (
-            <GembaModules
-              gembaData={gembaData}
-              modules={modules}
-              currentDate={currentDate}
-              completedModules={completedModules}
-              onBack={() => setGembaStarted(false)}
-              onCancel={handleCancelGemba}
-              onOpenModule={handleOpenModule}
-            />
-          )}
-
-        {currentPage === "nuevo-gemba" &&
-          gembaStarted &&
-          activeGembaModule === "seguridad" && (
-            <Seguridad
-              gembaData={gembaData}
-              onBack={() => setActiveGembaModule(null)}
-              onComplete={handleCompleteSafety}
-            />
-          )}
-
-        {currentPage === "nuevo-gemba" &&
-          gembaStarted &&
-          activeGembaModule === "calidad" && (
-            <Calidad
-              gembaData={gembaData}
-              onBack={() => setActiveGembaModule(null)}
-              onComplete={handleCompleteQuality}
-            />
-          )}
-
-        {currentPage === "nuevo-gemba" &&
-          gembaStarted &&
-          activeGembaModule === "proceso" && (
-            <Proceso
-              gembaData={gembaData}
-              onBack={() => setActiveGembaModule(null)}
-              onComplete={handleCompleteProcess}
-            />
-          )}
-
-        {currentPage === "plan-accion" && (
-          <PlaceholderPage
-            title="Plan de Acción"
-            text="Aquí se consolidarán las acciones generadas durante los Gemba Walks."
-            Icon={ClipboardList}
-          />
-        )}
-
-        {currentPage === "mantenimiento" && (
-          <PlaceholderPage
-            title="Mantenimiento"
-            text="Aquí se recibirán, planificarán y asignarán las intervenciones técnicas."
-            Icon={Wrench}
-          />
-        )}
-
-        {currentPage === "mis-tareas" && (
-          <PlaceholderPage
-            title="Mis tareas"
-            text="Aquí cada responsable visualizará y gestionará las actividades que tiene asignadas."
-            Icon={ListTodo}
-          />
-        )}
-      </main>
-    </div>
-  );
-}
-
-function Dashboard({ modules, onNewGemba }) {
   return (
     <>
       <header className="page-header">
         <div>
-          <span className="eyebrow">Gestión de Rutina</span>
-          <h2>Dashboard Gemba</h2>
+          <span className="eyebrow">Gemba · Proceso / Productividad</span>
+          <h2>Revisión de Proceso</h2>
 
           <p>
-            Observá, detectá oportunidades y asegurá el cierre de las acciones.
+            Identificá desperdicios, pérdidas y oportunidades de mejora
+            directamente en el flujo real de trabajo.
           </p>
         </div>
 
-        <button className="primary-button" onClick={onNewGemba}>
-          <Footprints size={20} />
-          Nuevo Gemba Walk
-        </button>
-      </header>
-
-      <section className="kpi-grid">
-        <div className="kpi-card">
-          <span>Gembas este mes</span>
-          <strong>24</strong>
-          <small>+6 vs. mes anterior</small>
-        </div>
-
-        <div className="kpi-card">
-          <span>Hallazgos abiertos</span>
-          <strong>17</strong>
-          <small>5 de prioridad alta</small>
-        </div>
-
-        <div className="kpi-card">
-          <span>Acciones cerradas</span>
-          <strong>43</strong>
-          <small>82% de cumplimiento</small>
-        </div>
-
-        <div className="kpi-card">
-          <span>Acciones vencidas</span>
-          <strong>6</strong>
-          <small>Requieren seguimiento</small>
-        </div>
-      </section>
-
-      <section className="section-block">
-        <div className="section-heading">
-          <div>
-            <span className="eyebrow">Pilares Gemba</span>
-            <h3>Módulos de observación</h3>
-          </div>
-
-          <p>
-            Cinco enfoques para observar el trabajo real e identificar
-            oportunidades de mejora.
-          </p>
-        </div>
-
-        <div className="module-grid">
-          {modules.map((module) => {
-            const Icon = module.icon;
-
-            return (
-              <article className="module-card" key={module.id}>
-                <div className={`module-icon ${module.id}`}>
-                  <Icon size={25} />
-                </div>
-
-                <div>
-                  <h4>{module.name}</h4>
-                  <p>{module.description}</p>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-    </>
-  );
-}
-
-function NewGembaForm({
-  gembaData,
-  maquinas,
-  procesosDisponibles,
-  colaboradores,
-  currentDate,
-  onChange,
-  onSubmit,
-  onCancel,
-}) {
-  return (
-    <>
-      <header className="page-header">
-        <div>
-          <span className="eyebrow">Nuevo recorrido</span>
-          <h2>Iniciar Gemba Walk</h2>
-
-          <p>
-            Registrá el contexto de la observación antes de iniciar el
-            recorrido.
-          </p>
-        </div>
-      </header>
-
-      <section className="gemba-form-layout">
-        <form className="gemba-form-card" onSubmit={onSubmit}>
-          <div className="form-card-header">
-            <div>
-              <span className="step-label">Paso 1 de 2</span>
-              <h3>Datos generales</h3>
-
-              <p>
-                Esta información quedará asociada a todos los hallazgos
-                registrados durante el Gemba.
-              </p>
-            </div>
-
-            <div className="date-badge">
-              <CalendarDays size={18} />
-              <span>{currentDate}</span>
-            </div>
-          </div>
-
-          <div className="form-grid">
-            <label className="form-field">
-              <span>
-                <Factory size={17} />
-                Máquina / Equipo
-              </span>
-
-              <select
-                name="maquina"
-                value={gembaData.maquina}
-                onChange={onChange}
-              >
-                <option value="">Seleccionar máquina</option>
-
-                {maquinas.map((maquina) => (
-                  <option value={maquina} key={maquina}>
-                    {maquina}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="form-field">
-              <span>
-                <Workflow size={17} />
-                Proceso
-              </span>
-
-              <select
-                name="proceso"
-                value={gembaData.proceso}
-                onChange={onChange}
-                disabled={!gembaData.maquina}
-              >
-                <option value="">
-                  {!gembaData.maquina
-                    ? "Primero seleccioná una máquina"
-                    : "Seleccionar proceso"}
-                </option>
-
-                {procesosDisponibles.map((proceso) => (
-                  <option value={proceso} key={proceso}>
-                    {proceso}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="form-field">
-              <span>
-                <User size={17} />
-                Colaborador observado
-              </span>
-
-              <select
-                name="collaborator"
-                value={gembaData.collaborator}
-                onChange={onChange}
-              >
-                <option value="">Seleccionar colaborador</option>
-
-                {colaboradores.map((colaborador) => (
-                  <option value={colaborador} key={colaborador}>
-                    {colaborador}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="form-field">
-              <span>
-                <Hammer size={17} />
-                Tarea observada
-              </span>
-
-              <input
-                type="text"
-                name="task"
-                value={gembaData.task}
-                onChange={onChange}
-              />
-            </label>
-
-            <label className="form-field form-field-full">
-              <span>
-                <User size={17} />
-                Auditor
-              </span>
-
-              <select
-                name="auditor"
-                value={gembaData.auditor}
-                onChange={onChange}
-              >
-                <option value="Pablo Hernández">
-                  Pablo Hernández
-                </option>
-
-                <option value="José Suruy">
-                  José Suruy
-                </option>
-
-                <option value="Ricardo Estrada">
-                  Ricardo Estrada
-                </option>
-              </select>
-            </label>
-          </div>
-
-          <div className="form-actions">
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={onCancel}
-            >
-              <ArrowLeft size={18} />
-              Cancelar
-            </button>
-
-            <button type="submit" className="primary-button">
-              Iniciar Gemba
-              <ArrowRight size={18} />
-            </button>
-          </div>
-        </form>
-
-        <aside className="gemba-help-card">
-          <div className="help-icon">
-            <Footprints size={26} />
-          </div>
-
-          <h3>Antes de comenzar</h3>
-
-          <p>
-            Identificá claramente la máquina, el proceso y la actividad que
-            estás observando.
-          </p>
-
-          <div className="help-list">
-            <div>
-              <CheckCircle2 size={18} />
-              <span>Observá el trabajo real.</span>
-            </div>
-
-            <div>
-              <CheckCircle2 size={18} />
-              <span>Conversá con el colaborador.</span>
-            </div>
-
-            <div>
-              <CheckCircle2 size={18} />
-              <span>Registrá evidencia cuando aporte valor.</span>
-            </div>
-
-            <div>
-              <CheckCircle2 size={18} />
-              <span>Buscá oportunidades, no culpables.</span>
-            </div>
-          </div>
-        </aside>
-      </section>
-    </>
-  );
-}
-
-function GembaModules({
-  gembaData,
-  modules,
-  currentDate,
-  completedModules,
-  onBack,
-  onCancel,
-  onOpenModule,
-}) {
-  return (
-    <>
-      <header className="page-header">
-        <div>
-          <span className="eyebrow">Gemba en curso</span>
-          <h2>Seleccioná un módulo</h2>
-
-          <p>
-            Podrás recorrer los cinco pilares y registrar las observaciones
-            correspondientes.
-          </p>
-        </div>
-
-        <button className="secondary-button" onClick={onCancel}>
-          Finalizar después
+        <button className="secondary-button" onClick={onBack}>
+          <ArrowLeft size={18} />
+          Volver a módulos
         </button>
       </header>
 
       <section className="gemba-context-card">
         <div className="context-item">
-          <span>Máquina / Equipo</span>
+          <span>Máquina</span>
           <strong>{gembaData.maquina}</strong>
         </div>
 
@@ -730,97 +126,276 @@ function GembaModules({
         </div>
       </section>
 
-      <section className="section-block">
-        <div className="section-heading">
-          <div>
-            <span className="eyebrow">Paso 2 de 2</span>
-            <h3>Módulos del Gemba</h3>
+      <section className="audit-section-card">
+        <div className="audit-section-header">
+          <div className="audit-section-icon behavior">
+            <Gauge size={25} />
           </div>
 
-          <p>{currentDate}</p>
+          <div>
+            <span className="step-label">Proceso / Productividad</span>
+            <h3>Desperdicios Lean</h3>
+
+            <p>
+              Observá el proceso e identificá actividades que consumen tiempo,
+              movimiento o recursos sin agregar valor.
+            </p>
+          </div>
         </div>
 
-        <div className="gemba-module-grid">
-          {modules.map((module) => {
-            const Icon = module.icon;
-            const completed = module.status === "Completado";
+        <div className="audit-question">
+          <div>
+            <span className="question-number">1</span>
 
-            return (
-              <button
-                type="button"
-                className={
-                  completed
-                    ? "gemba-module-card completed"
-                    : "gemba-module-card"
-                }
-                key={module.id}
-                onClick={() => onOpenModule(module.id)}
+            <div>
+              <strong>
+                ¿Se observan desperdicios o pérdidas en el proceso?
+              </strong>
+
+              <p>
+                Considerá los ocho desperdicios Lean durante la observación.
+              </p>
+            </div>
+          </div>
+
+          <div className="yes-no-group">
+            <button
+              type="button"
+              className={
+                existenDesperdicios === "si"
+                  ? "choice-button selected danger"
+                  : "choice-button"
+              }
+              onClick={() => setExistenDesperdicios("si")}
+            >
+              Sí
+            </button>
+
+            <button
+              type="button"
+              className={
+                existenDesperdicios === "no"
+                  ? "choice-button selected success"
+                  : "choice-button"
+              }
+              onClick={() => {
+                setExistenDesperdicios("no");
+                setHallazgos([]);
+              }}
+            >
+              No
+            </button>
+          </div>
+        </div>
+
+        {existenDesperdicios === "si" && (
+          <div className="conditional-area">
+            <div className="conditional-title">
+              <span className="question-number">2</span>
+
+              <div>
+                <strong>
+                  ¿Qué desperdicios u oportunidades observaste?
+                </strong>
+
+                <p>
+                  Registrá cada oportunidad de forma independiente.
+                </p>
+              </div>
+            </div>
+
+            <div className="finding-entry-card">
+              <div className="form-grid">
+                <label className="form-field">
+                  <span>Tipo de desperdicio</span>
+
+                  <select
+                    value={nuevoHallazgo.tipo}
+                    onChange={(event) =>
+                      setNuevoHallazgo((previous) => ({
+                        ...previous,
+                        tipo: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">
+                      Seleccionar desperdicio
+                    </option>
+
+                    {desperdiciosLean.map((desperdicio) => (
+                      <option
+                        value={desperdicio}
+                        key={desperdicio}
+                      >
+                        {desperdicio}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="form-field">
+                  <span>Impacto</span>
+
+                  <select
+                    value={nuevoHallazgo.impacto}
+                    onChange={(event) =>
+                      setNuevoHallazgo((previous) => ({
+                        ...previous,
+                        impacto: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="Bajo">Bajo</option>
+                    <option value="Medio">Medio</option>
+                    <option value="Alto">Alto</option>
+                  </select>
+                </label>
+              </div>
+
+              <label
+                className="form-field"
+                style={{ marginTop: "16px" }}
               >
-                <div className={`module-icon ${module.id}`}>
-                  <Icon size={27} />
+                <span>Descripción de la oportunidad</span>
+
+                <textarea
+                  rows="4"
+                  value={nuevoHallazgo.descripcion}
+                  onChange={(event) =>
+                    setNuevoHallazgo((previous) => ({
+                      ...previous,
+                      descripcion: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <label
+                className="form-field"
+                style={{ marginTop: "16px" }}
+              >
+                <span>Estimación de pérdida (opcional)</span>
+
+                <input
+                  type="text"
+                  value={nuevoHallazgo.perdidaEstimada}
+                  onChange={(event) =>
+                    setNuevoHallazgo((previous) => ({
+                      ...previous,
+                      perdidaEstimada: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <div className="finding-entry-actions">
+                <button
+                  type="button"
+                  className="evidence-button"
+                  onClick={() =>
+                    alert(
+                      "La carga de fotografías se conectará posteriormente."
+                    )
+                  }
+                >
+                  <Camera size={18} />
+                  Agregar evidencia
+                </button>
+
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={agregarHallazgo}
+                >
+                  <Plus size={18} />
+                  Agregar oportunidad
+                </button>
+              </div>
+            </div>
+
+            {hallazgos.length > 0 && (
+              <div className="findings-list">
+                <div className="findings-list-title">
+                  <strong>
+                    Oportunidades registradas ({hallazgos.length})
+                  </strong>
                 </div>
 
-                <div className="gemba-module-content">
-                  <div className="module-title-row">
-                    <h4>{module.name}</h4>
+                {hallazgos.map((hallazgo, index) => (
+                  <article className="finding-item" key={hallazgo.id}>
+                    <div className="finding-index">{index + 1}</div>
 
-                    <span
-                      className={
-                        completed
-                          ? "status-pill completed"
-                          : "status-pill"
-                      }
-                    >
-                      {completed && <CheckCircle2 size={13} />}
-                      {module.status}
-                    </span>
-                  </div>
+                    <div className="finding-item-content">
+                      <div className="finding-item-top">
+                        <div>
+                          <p>
+                            <strong>{hallazgo.tipo}</strong>
+                          </p>
 
-                  <p>{module.description}</p>
+                          <p>{hallazgo.descripcion}</p>
 
-                  <span className="enter-module">
-                    {completed
-                      ? "Revisar nuevamente"
-                      : "Iniciar revisión"}
+                          {hallazgo.perdidaEstimada && (
+                            <p>
+                              <strong>Pérdida estimada:</strong>{" "}
+                              {hallazgo.perdidaEstimada}
+                            </p>
+                          )}
+                        </div>
 
-                    <ArrowRight size={17} />
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                        <button
+                          type="button"
+                          className="icon-delete-button"
+                          onClick={() =>
+                            eliminarHallazgo(hallazgo.id)
+                          }
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      </div>
 
-        <div className="gemba-bottom-actions">
-          <button className="secondary-button" onClick={onBack}>
+                      <div className="finding-tags">
+                        <span
+                          className={`criticality-tag ${
+                            hallazgo.impacto === "Bajo"
+                              ? "baja"
+                              : hallazgo.impacto === "Medio"
+                                ? "media"
+                                : "alta"
+                          }`}
+                        >
+                          Impacto {hallazgo.impacto}
+                        </span>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="audit-navigation">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onBack}
+          >
             <ArrowLeft size={18} />
-            Editar datos generales
+            Volver
           </button>
 
-          <div className="gemba-progress">
-            <strong>{completedModules} de 5</strong>
-            <span>módulos revisados</span>
-          </div>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={finalizarProceso}
+          >
+            <CheckCircle2 size={18} />
+            Completar Proceso
+          </button>
         </div>
       </section>
     </>
   );
 }
 
-function PlaceholderPage({ title, text, Icon }) {
-  return (
-    <section className="placeholder-page">
-      <div className="placeholder-icon">
-        <Icon size={34} />
-      </div>
-
-      <span className="eyebrow">GDR Gemba</span>
-
-      <h2>{title}</h2>
-
-      <p>{text}</p>
-    </section>
-  );
-}
-
-export default App;
+export default Proceso;
