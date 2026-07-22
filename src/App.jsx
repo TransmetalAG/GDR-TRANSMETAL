@@ -28,6 +28,7 @@ import Seguridad from "./modules/Seguridad.jsx";
 import Calidad from "./modules/Calidad.jsx";
 import Proceso from "./modules/Proceso.jsx";
 import Mantenimiento from "./modules/Mantenimiento.jsx";
+import GestionMantenimiento from "./modules/GestionMantenimiento.jsx";
 
 import ResumenGemba from "./components/ResumenGemba.jsx";
 import { supabase } from "./lib/supabase.js";
@@ -765,11 +766,7 @@ function App() {
 
         {currentPage ===
           "mantenimiento" && (
-          <PlaceholderPage
-            title="Mantenimiento"
-            text="Aquí se recibirán, planificarán y asignarán las intervenciones técnicas."
-            Icon={Wrench}
-          />
+          <GestionMantenimiento />
         )}
 
         {currentPage ===
