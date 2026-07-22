@@ -21,7 +21,9 @@ import {
 
 import { catalogo } from "./data/CatalogoMaquinas.js";
 import { colaboradores } from "./data/CatalogoColaboradores.js";
+
 import Seguridad from "./modules/Seguridad.jsx";
+import Calidad from "./modules/Calidad.jsx";
 
 function App() {
   const [currentPage, setCurrentPage] = useState("dashboard");
@@ -54,7 +56,7 @@ function App() {
     {
       id: "calidad",
       name: "Calidad",
-      description: "Producto, controles de proceso y estándares",
+      description: "Condición del producto y controles del proceso",
       icon: Award,
     },
     {
@@ -199,15 +201,31 @@ function App() {
       return;
     }
 
-    alert(
-      `El módulo ${baseModules.find((item) => item.id === moduleId)?.name} todavía no está construido.`
-    );
+    if (moduleId === "calidad") {
+      setActiveGembaModule("calidad");
+      return;
+    }
+
+    const moduleName =
+      baseModules.find((item) => item.id === moduleId)?.name ||
+      "Este módulo";
+
+    alert(`${moduleName} todavía no está construido.`);
   }
 
   function handleCompleteSafety(result) {
     setModuleResults((previous) => ({
       ...previous,
       seguridad: result,
+    }));
+
+    setActiveGembaModule(null);
+  }
+
+  function handleCompleteQuality(result) {
+    setModuleResults((previous) => ({
+      ...previous,
+      calidad: result,
     }));
 
     setActiveGembaModule(null);
@@ -309,6 +327,16 @@ function App() {
               gembaData={gembaData}
               onBack={() => setActiveGembaModule(null)}
               onComplete={handleCompleteSafety}
+            />
+          )}
+
+        {currentPage === "nuevo-gemba" &&
+          gembaStarted &&
+          activeGembaModule === "calidad" && (
+            <Calidad
+              gembaData={gembaData}
+              onBack={() => setActiveGembaModule(null)}
+              onComplete={handleCompleteQuality}
             />
           )}
 
