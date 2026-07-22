@@ -8,9 +8,19 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-function Proceso({ gembaData, onBack, onComplete }) {
-  const [existenDesperdicios, setExistenDesperdicios] = useState("");
-  const [hallazgos, setHallazgos] = useState([]);
+function Proceso({
+  gembaData,
+  initialData,
+  onBack,
+  onComplete,
+}) {
+  const [existenDesperdicios, setExistenDesperdicios] = useState(
+    initialData?.existenDesperdicios || ""
+  );
+
+  const [hallazgos, setHallazgos] = useState(
+    initialData?.hallazgos || []
+  );
 
   const [nuevoHallazgo, setNuevoHallazgo] = useState({
     tipo: "",
@@ -37,7 +47,9 @@ function Proceso({ gembaData, onBack, onComplete }) {
     }
 
     if (!nuevoHallazgo.descripcion.trim()) {
-      alert("Describí la oportunidad o desperdicio observado.");
+      alert(
+        "Describí la oportunidad o desperdicio observado."
+      );
       return;
     }
 
@@ -59,18 +71,27 @@ function Proceso({ gembaData, onBack, onComplete }) {
 
   function eliminarHallazgo(id) {
     setHallazgos((previous) =>
-      previous.filter((hallazgo) => hallazgo.id !== id)
+      previous.filter(
+        (hallazgo) => hallazgo.id !== id
+      )
     );
   }
 
   function finalizarProceso() {
     if (!existenDesperdicios) {
-      alert("Indicá si se observan desperdicios o pérdidas en el proceso.");
+      alert(
+        "Indicá si se observan desperdicios o pérdidas en el proceso."
+      );
       return;
     }
 
-    if (existenDesperdicios === "si" && hallazgos.length === 0) {
-      alert("Agregá al menos un desperdicio u oportunidad.");
+    if (
+      existenDesperdicios === "si" &&
+      hallazgos.length === 0
+    ) {
+      alert(
+        "Agregá al menos un desperdicio u oportunidad."
+      );
       return;
     }
 
@@ -84,16 +105,22 @@ function Proceso({ gembaData, onBack, onComplete }) {
     <>
       <header className="page-header">
         <div>
-          <span className="eyebrow">Gemba · Proceso / Productividad</span>
+          <span className="eyebrow">
+            Gemba · Proceso / Productividad
+          </span>
+
           <h2>Revisión de Proceso</h2>
 
           <p>
-            Identificá desperdicios, pérdidas y oportunidades de mejora
-            directamente en el flujo real de trabajo.
+            Identificá desperdicios, pérdidas y oportunidades
+            de mejora directamente en el flujo real de trabajo.
           </p>
         </div>
 
-        <button className="secondary-button" onClick={onBack}>
+        <button
+          className="secondary-button"
+          onClick={onBack}
+        >
           <ArrowLeft size={18} />
           Volver a módulos
         </button>
@@ -133,12 +160,16 @@ function Proceso({ gembaData, onBack, onComplete }) {
           </div>
 
           <div>
-            <span className="step-label">Proceso / Productividad</span>
+            <span className="step-label">
+              Proceso / Productividad
+            </span>
+
             <h3>Desperdicios Lean</h3>
 
             <p>
-              Observá el proceso e identificá actividades que consumen tiempo,
-              movimiento o recursos sin agregar valor.
+              Observá el proceso e identificá actividades que
+              consumen tiempo, movimiento o recursos sin agregar
+              valor.
             </p>
           </div>
         </div>
@@ -149,11 +180,13 @@ function Proceso({ gembaData, onBack, onComplete }) {
 
             <div>
               <strong>
-                ¿Se observan desperdicios o pérdidas en el proceso?
+                ¿Se observan desperdicios o pérdidas en el
+                proceso?
               </strong>
 
               <p>
-                Considerá los ocho desperdicios Lean durante la observación.
+                Considerá los ocho desperdicios Lean durante la
+                observación.
               </p>
             </div>
           </div>
@@ -166,7 +199,9 @@ function Proceso({ gembaData, onBack, onComplete }) {
                   ? "choice-button selected danger"
                   : "choice-button"
               }
-              onClick={() => setExistenDesperdicios("si")}
+              onClick={() =>
+                setExistenDesperdicios("si")
+              }
             >
               Sí
             </button>
@@ -199,7 +234,8 @@ function Proceso({ gembaData, onBack, onComplete }) {
                 </strong>
 
                 <p>
-                  Registrá cada oportunidad de forma independiente.
+                  Registrá cada oportunidad de forma
+                  independiente.
                 </p>
               </div>
             </div>
@@ -222,14 +258,16 @@ function Proceso({ gembaData, onBack, onComplete }) {
                       Seleccionar desperdicio
                     </option>
 
-                    {desperdiciosLean.map((desperdicio) => (
-                      <option
-                        value={desperdicio}
-                        key={desperdicio}
-                      >
-                        {desperdicio}
-                      </option>
-                    ))}
+                    {desperdiciosLean.map(
+                      (desperdicio) => (
+                        <option
+                          value={desperdicio}
+                          key={desperdicio}
+                        >
+                          {desperdicio}
+                        </option>
+                      )
+                    )}
                   </select>
                 </label>
 
@@ -245,9 +283,17 @@ function Proceso({ gembaData, onBack, onComplete }) {
                       }))
                     }
                   >
-                    <option value="Bajo">Bajo</option>
-                    <option value="Medio">Medio</option>
-                    <option value="Alto">Alto</option>
+                    <option value="Bajo">
+                      Bajo
+                    </option>
+
+                    <option value="Medio">
+                      Medio
+                    </option>
+
+                    <option value="Alto">
+                      Alto
+                    </option>
                   </select>
                 </label>
               </div>
@@ -256,15 +302,20 @@ function Proceso({ gembaData, onBack, onComplete }) {
                 className="form-field"
                 style={{ marginTop: "16px" }}
               >
-                <span>Descripción de la oportunidad</span>
+                <span>
+                  Descripción de la oportunidad
+                </span>
 
                 <textarea
                   rows="4"
-                  value={nuevoHallazgo.descripcion}
+                  value={
+                    nuevoHallazgo.descripcion
+                  }
                   onChange={(event) =>
                     setNuevoHallazgo((previous) => ({
                       ...previous,
-                      descripcion: event.target.value,
+                      descripcion:
+                        event.target.value,
                     }))
                   }
                 />
@@ -274,15 +325,20 @@ function Proceso({ gembaData, onBack, onComplete }) {
                 className="form-field"
                 style={{ marginTop: "16px" }}
               >
-                <span>Estimación de pérdida (opcional)</span>
+                <span>
+                  Estimación de pérdida (opcional)
+                </span>
 
                 <input
                   type="text"
-                  value={nuevoHallazgo.perdidaEstimada}
+                  value={
+                    nuevoHallazgo.perdidaEstimada
+                  }
                   onChange={(event) =>
                     setNuevoHallazgo((previous) => ({
                       ...previous,
-                      perdidaEstimada: event.target.value,
+                      perdidaEstimada:
+                        event.target.value,
                     }))
                   }
                 />
@@ -317,58 +373,81 @@ function Proceso({ gembaData, onBack, onComplete }) {
               <div className="findings-list">
                 <div className="findings-list-title">
                   <strong>
-                    Oportunidades registradas ({hallazgos.length})
+                    Oportunidades registradas (
+                    {hallazgos.length})
                   </strong>
                 </div>
 
-                {hallazgos.map((hallazgo, index) => (
-                  <article className="finding-item" key={hallazgo.id}>
-                    <div className="finding-index">{index + 1}</div>
+                {hallazgos.map(
+                  (hallazgo, index) => (
+                    <article
+                      className="finding-item"
+                      key={hallazgo.id}
+                    >
+                      <div className="finding-index">
+                        {index + 1}
+                      </div>
 
-                    <div className="finding-item-content">
-                      <div className="finding-item-top">
-                        <div>
-                          <p>
-                            <strong>{hallazgo.tipo}</strong>
-                          </p>
-
-                          <p>{hallazgo.descripcion}</p>
-
-                          {hallazgo.perdidaEstimada && (
+                      <div className="finding-item-content">
+                        <div className="finding-item-top">
+                          <div>
                             <p>
-                              <strong>Pérdida estimada:</strong>{" "}
-                              {hallazgo.perdidaEstimada}
+                              <strong>
+                                {hallazgo.tipo}
+                              </strong>
                             </p>
-                          )}
+
+                            <p>
+                              {
+                                hallazgo.descripcion
+                              }
+                            </p>
+
+                            {hallazgo.perdidaEstimada && (
+                              <p>
+                                <strong>
+                                  Pérdida estimada:
+                                </strong>{" "}
+                                {
+                                  hallazgo.perdidaEstimada
+                                }
+                              </p>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            className="icon-delete-button"
+                            onClick={() =>
+                              eliminarHallazgo(
+                                hallazgo.id
+                              )
+                            }
+                          >
+                            <Trash2 size={17} />
+                          </button>
                         </div>
 
-                        <button
-                          type="button"
-                          className="icon-delete-button"
-                          onClick={() =>
-                            eliminarHallazgo(hallazgo.id)
-                          }
-                        >
-                          <Trash2 size={17} />
-                        </button>
+                        <div className="finding-tags">
+                          <span
+                            className={`criticality-tag ${
+                              hallazgo.impacto ===
+                              "Bajo"
+                                ? "baja"
+                                : hallazgo.impacto ===
+                                    "Medio"
+                                  ? "media"
+                                  : "alta"
+                            }`}
+                          >
+                            Impacto{" "}
+                            {hallazgo.impacto}
+                          </span>
+                        </div>
                       </div>
-
-                      <div className="finding-tags">
-                        <span
-                          className={`criticality-tag ${
-                            hallazgo.impacto === "Bajo"
-                              ? "baja"
-                              : hallazgo.impacto === "Medio"
-                                ? "media"
-                                : "alta"
-                          }`}
-                        >
-                          Impacto {hallazgo.impacto}
-                        </span>
-                      </div>
-                    </div>
-                  </article>
-                ))}
+                    </article>
+                  )
+                )}
               </div>
             )}
           </div>
