@@ -482,6 +482,88 @@ function GestionMantenimiento() {
     await cargarDatos();
   }
 
+  async function cambiarEstadoDirecto(tareaId, nuevoEstado) {
+    // Actualización optimista para que el cambio se vea inmediatamente.
+    const estadoAnterior = tareas.find(
+      (item) => item.id === tareaId
+    )?.estado;
+
+    setTareas((previous) =>
+      previous.map((item) =>
+        item.id === tareaId
+          ? { ...item, estado: nuevoEstado }
+          : item
+      )
+    );
+
+    const payload = {
+      estado: nuevoEstado,
+    };
+
+    // Si se marca como terminada, registramos fecha/hora de cierre.
+    // Si se vuelve a abrir, limpiamos la fecha de cierre.
+    if (nuevoEstado === "Terminada") {
+      payload.fecha_cierre = new Date().toISOString();
+    } else {
+      payload.fecha_cierre = null;
+    }
+
+    const { error } = await supabase
+      .from("mantenimiento")
+      .update(payload)
+      .eq("id", tareaId)
+      .eq("tipo_registro", "tarea");
+
+    if (error) {
+      console.error("Error al cambiar estado:", error);
+
+      // Revertimos visualmente si Supabase falla.
+      setTareas((previous) =>
+        previous.map((item) =>
+          item.id === tareaId
+            ? { ...item, estado: estadoAnterior }
+            : item
+        )
+      );
+
+      alert(
+        `No se pudo cambiar el estado de la tarea.\n\n${error.message}`
+      );
+    }
+  }
+
+  function getEstiloEstado(estado) {
+    if (estado === "Terminada") {
+      return {
+        background: "#dcfce7",
+        color: "#15803d",
+        border: "1px solid #bbf7d0",
+      };
+    }
+
+    if (estado === "En proceso") {
+      return {
+        background: "#fef3c7",
+        color: "#b45309",
+        border: "1px solid #fde68a",
+      };
+    }
+
+    if (estado === "Asignada") {
+      return {
+        background: "#dbeafe",
+        color: "#1d4ed8",
+        border: "1px solid #bfdbfe",
+      };
+    }
+
+    return {
+      background: "#fee2e2",
+      color: "#b91c1c",
+      border: "1px solid #fecaca",
+    };
+  }
+
   function actualizarCapacidadLocal(tecnico, value) {
     const horas = value === "" ? "" : Number(value);
 
@@ -1302,9 +1384,44 @@ function GestionMantenimiento() {
                       {tarea.prioridad}
                     </span>
 
-                    <span className="maintenance-tag">
-                      {tarea.estado}
-                    </span>
+                    <select
+                      value={tarea.estado}
+                      onChange={(event) =>
+                        cambiarEstadoDirecto(
+                          tarea.id,
+                          event.target.value
+                        )
+                      }
+                      aria-label={`Cambiar estado de ${tarea.tarea}`}
+                      title="Cambiar estado"
+                      style={{
+                        ...getEstiloEstado(tarea.estado),
+                        borderRadius: "999px",
+                        padding: "6px 30px 6px 12px",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        outline: "none",
+                        width: "auto",
+                        minWidth: "145px",
+                      }}
+                    >
+                      <option value="Pendiente de asignación">
+                        Pendiente de asignación
+                      </option>
+
+                      <option value="Asignada">
+                        Asignada
+                      </option>
+
+                      <option value="En proceso">
+                        En proceso
+                      </option>
+
+                      <option value="Terminada">
+                        Terminada
+                      </option>
+                    </select>
 
                     <span className="status-pill">
                       Origen: {tarea.origen}
