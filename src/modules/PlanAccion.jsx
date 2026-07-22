@@ -2,19 +2,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ClipboardList,
   Plus,
-  Search,
-  Filter,
-  CalendarDays,
-  User,
-  Workflow,
   Trash2,
-  ChevronDown,
   X,
   CheckCircle2,
-  Factory,
 } from "lucide-react";
 
-import { catalogo } from "../data/CatalogoMaquinas.js";
 import { colaboradores } from "../data/CatalogoColaboradores.js";
 import { supabase } from "../lib/supabase.js";
 
@@ -47,111 +39,49 @@ function formatDate(dateString) {
   }).format(new Date(`${dateString}T12:00:00`));
 }
 
-function getMonday(dateValue = new Date()) {
-  const date =
-    typeof dateValue === "string"
-      ? new Date(`${dateValue}T12:00:00`)
-      : new Date(dateValue);
-
-  const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-
-  date.setDate(date.getDate() + diff);
-  date.setHours(12, 0, 0, 0);
-
-  return toDateString(date);
-}
-
-function addDays(dateString, days) {
-  const date = new Date(`${dateString}T12:00:00`);
-  date.setDate(date.getDate() + days);
-  return toDateString(date);
-}
-
-function getMonthRange(dateValue = new Date()) {
-  const date =
-    typeof dateValue === "string"
-      ? new Date(`${dateValue}T12:00:00`)
-      : new Date(dateValue);
-
-  const start = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    1,
-    12
-  );
-
-  const end = new Date(
-    date.getFullYear(),
-    date.getMonth() + 1,
-    0,
-    12
-  );
-
-  return {
-    start: toDateString(start),
-    end: toDateString(end),
-  };
-}
-
 function normalizarAccion(row) {
-  const sinPlan =
+  const esGembaSinPlan =
     row.origen === "Gemba" &&
     !row.que &&
+    !row.como &&
     !row.responsable &&
     !row.fecha_compromiso;
 
   return {
     id: row.id,
-    gembaId: row.gemba_id || null,
     origen: row.origen || "Manual",
-
     pilar: row.pilar || "",
-    maquina: row.maquina || "",
-    proceso: row.proceso || "",
-    auditor: row.auditor || "",
-    colaborador: row.colaborador || "",
-
     causa: row.hallazgo || "",
     que: row.que || "",
     como: row.como || "",
     quien: row.responsable || "",
     cuando: row.fecha_compromiso || "",
-
     estado:
-      sinPlan && row.estado === "Pendiente"
+      esGembaSinPlan
         ? "Sin planificar"
         : row.estado || "Pendiente",
-
-    observaciones: row.observaciones || "",
-    evidencia: row.evidencia || "",
     fechaCierre: row.fecha_cierre || null,
-    createdAt: row.created_at || null,
   };
 }
 
 function PlanAccion() {
   const [loading, setLoading] = useState(true);
-  const [guardando, setGuardando] = useState(false);
-
   const [acciones, setAcciones] = useState([]);
 
-  const [mostrarNuevaAccion, setMostrarNuevaAccion] =
-    useState(false);
+  const [filtrosEncabezado, setFiltrosEncabezado] = useState({
+    pilar: "",
+    quien: "",
+    cuando: "",
+    estado: "",
+  });
 
   const [editandoCelda, setEditandoCelda] = useState(null);
   const [valorEdicion, setValorEdicion] = useState("");
 
-  const [filtros, setFiltros] = useState({
-    busqueda: "",
-    responsable: "",
-    pilar: "",
-    estado: "",
-    periodo: "",
-    fechaReferencia: toDateString(new Date()),
-  });
+  const [mostrandoNuevaFila, setMostrandoNuevaFila] = useState(false);
+  const [guardandoNueva, setGuardandoNueva] = useState(false);
 
-  const [nuevaAccion, setNuevaAccion] = useState({
+  const [nuevaFila, setNuevaFila] = useState({
     pilar: "",
     causa: "",
     que: "",
@@ -159,52 +89,52 @@ function PlanAccion() {
     quien: "",
     cuando: "",
     estado: "Pendiente",
-    maquina: "",
-    proceso: "",
-    observaciones: "",
   });
-
-  const maquinas = useMemo(() => {
-    return [
-      ...new Set(
-        catalogo.map((item) => item.maquina)
-      ),
-    ].sort((a, b) =>
-      a.localeCompare(b, "es")
-    );
-  }, []);
-
-  const procesosDisponibles = useMemo(() => {
-    if (!nuevaAccion.maquina) return [];
-
-    return [
-      ...new Set(
-        catalogo
-          .filter(
-            (item) =>
-              item.maquina === nuevaAccion.maquina
-          )
-          .map((item) => item.proceso)
-      ),
-    ].sort((a, b) =>
-      a.localeCompare(b, "es")
-    );
-  }, [nuevaAccion.maquina]);
 
   const responsables = useMemo(() => {
     const existentes = acciones
       .map((accion) => accion.quien)
       .filter(Boolean);
 
-    return [
-      ...new Set([
-        ...colaboradores,
-        ...existentes,
-      ]),
-    ].sort((a, b) =>
+    return [...new Set([...colaboradores, ...existentes])].sort((a, b) =>
       a.localeCompare(b, "es")
     );
   }, [acciones]);
+
+  const accionesVisibles = useMemo(() => {
+    return acciones.filter((accion) => {
+      const coincidePilar =
+        !filtrosEncabezado.pilar ||
+        accion.pilar === filtrosEncabezado.pilar;
+
+      const coincideQuien =
+        !filtrosEncabezado.quien ||
+        accion.quien === filtrosEncabezado.quien;
+
+      let coincideCuando = true;
+
+      if (filtrosEncabezado.cuando) {
+        coincideCuando =
+          accion.cuando === filtrosEncabezado.cuando;
+      }
+
+      let coincideEstado = true;
+
+      if (filtrosEncabezado.estado === "Atrasada") {
+        coincideEstado = estaAtrasada(accion);
+      } else if (filtrosEncabezado.estado) {
+        coincideEstado =
+          accion.estado === filtrosEncabezado.estado;
+      }
+
+      return (
+        coincidePilar &&
+        coincideQuien &&
+        coincideCuando &&
+        coincideEstado
+      );
+    });
+  }, [acciones, filtrosEncabezado]);
 
   useEffect(() => {
     cargarAcciones();
@@ -216,194 +146,52 @@ function PlanAccion() {
     const { data, error } = await supabase
       .from("plan_accion")
       .select("*")
-      .order("created_at", {
-        ascending: false,
-      });
+      .order("created_at", { ascending: false });
 
     if (error) {
-      console.error(
-        "Error al cargar Plan de Acción:",
-        error
-      );
-
-      alert(
-        `No se pudo cargar el Plan de Acción.\n\n${error.message}`
-      );
-
+      console.error("Error al cargar Plan de Acción:", error);
+      alert(`No se pudo cargar el Plan de Acción.\n\n${error.message}`);
       setLoading(false);
       return;
     }
 
-    setAcciones(
-      (data || []).map(normalizarAccion)
-    );
-
+    setAcciones((data || []).map(normalizarAccion));
     setLoading(false);
   }
 
-  function estaVencida(accion) {
+  function estaAtrasada(accion) {
     if (
       accion.estado === "Terminada" ||
-      accion.estado === "Sin planificar"
+      accion.estado === "Sin planificar" ||
+      !accion.cuando
     ) {
       return false;
     }
 
-    if (!accion.cuando) {
-      return false;
-    }
-
-    return (
-      accion.cuando <
-      toDateString(new Date())
-    );
+    return accion.cuando < toDateString(new Date());
   }
 
-  const indicadores = useMemo(() => {
-    return {
-      sinPlanificar: acciones.filter(
-        (accion) =>
-          accion.estado === "Sin planificar"
-      ).length,
-
-      pendientes: acciones.filter(
-        (accion) =>
-          accion.estado === "Pendiente"
-      ).length,
-
-      enProceso: acciones.filter(
-        (accion) =>
-          accion.estado === "En proceso"
-      ).length,
-
-      terminadas: acciones.filter(
-        (accion) =>
-          accion.estado === "Terminada"
-      ).length,
-
-      vencidas: acciones.filter(
-        estaVencida
-      ).length,
-    };
-  }, [acciones]);
-
-  const accionesFiltradas = useMemo(() => {
-    const texto = filtros.busqueda
-      .trim()
-      .toLowerCase();
-
-    let rangoFecha = null;
-
-    if (filtros.periodo === "semana") {
-      const inicio = getMonday(
-        filtros.fechaReferencia
-      );
-
-      rangoFecha = {
-        start: inicio,
-        end: addDays(inicio, 6),
-      };
-    }
-
-    if (filtros.periodo === "mes") {
-      rangoFecha = getMonthRange(
-        filtros.fechaReferencia
-      );
-    }
-
-    return acciones.filter((accion) => {
-      const coincideBusqueda =
-        !texto ||
-        accion.pilar
-          .toLowerCase()
-          .includes(texto) ||
-        accion.causa
-          .toLowerCase()
-          .includes(texto) ||
-        accion.que
-          .toLowerCase()
-          .includes(texto) ||
-        accion.como
-          .toLowerCase()
-          .includes(texto) ||
-        accion.quien
-          .toLowerCase()
-          .includes(texto);
-
-      const coincideResponsable =
-        !filtros.responsable ||
-        accion.quien ===
-          filtros.responsable;
-
-      const coincidePilar =
-        !filtros.pilar ||
-        accion.pilar === filtros.pilar;
-
-      let coincideEstado = true;
-
-      if (
-        filtros.estado === "Atrasadas"
-      ) {
-        coincideEstado =
-          estaVencida(accion);
-      } else if (filtros.estado) {
-        coincideEstado =
-          accion.estado === filtros.estado;
-      }
-
-      const coincidePeriodo =
-        !rangoFecha ||
-        (
-          accion.cuando &&
-          accion.cuando >=
-            rangoFecha.start &&
-          accion.cuando <=
-            rangoFecha.end
-        );
-
-      return (
-        coincideBusqueda &&
-        coincideResponsable &&
-        coincidePilar &&
-        coincideEstado &&
-        coincidePeriodo
-      );
-    });
-  }, [acciones, filtros]);
-
-  function handleFiltroChange(event) {
-    const { name, value } = event.target;
-
-    setFiltros((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
+  function estadoVisual(accion) {
+    return estaAtrasada(accion)
+      ? "Atrasada"
+      : accion.estado;
   }
 
-  function limpiarFiltros() {
-    setFiltros({
-      busqueda: "",
-      responsable: "",
-      pilar: "",
-      estado: "",
-      periodo: "",
-      fechaReferencia:
-        toDateString(new Date()),
-    });
+  function getColorEstado(estado) {
+    if (estado === "Terminada") return "#15803d";
+    if (estado === "En proceso") return "#d97706";
+    if (estado === "Pendiente") return "#dc2626";
+    if (estado === "Atrasada") return "#b91c1c";
+    return "#667085";
   }
 
-  function iniciarEdicion(
-    accion,
-    campo
-  ) {
+  function iniciarEdicion(accion, campo) {
     setEditandoCelda({
       id: accion.id,
       campo,
     });
 
-    setValorEdicion(
-      accion[campo] ?? ""
-    );
+    setValorEdicion(accion[campo] ?? "");
   }
 
   function cancelarEdicion() {
@@ -411,11 +199,7 @@ function PlanAccion() {
     setValorEdicion("");
   }
 
-  async function guardarCelda(
-    accion,
-    campo,
-    valor
-  ) {
+  async function guardarCelda(accion, campo, valor) {
     const mapaCampos = {
       pilar: "pilar",
       causa: "hallazgo",
@@ -426,8 +210,7 @@ function PlanAccion() {
       estado: "estado",
     };
 
-    const columnaDb =
-      mapaCampos[campo];
+    const columnaDb = mapaCampos[campo];
 
     if (!columnaDb) {
       cancelarEdicion();
@@ -439,43 +222,37 @@ function PlanAccion() {
         ? valor.trim()
         : valor;
 
-    let nuevoEstado =
-      accion.estado;
-
     const accionProyectada = {
       ...accion,
       [campo]: valorLimpio,
     };
 
-    const tienePlanMinimo =
-      accionProyectada.que &&
-      accionProyectada.quien &&
-      accionProyectada.cuando;
+    const planCompleto =
+      Boolean(accionProyectada.que) &&
+      Boolean(accionProyectada.como) &&
+      Boolean(accionProyectada.quien) &&
+      Boolean(accionProyectada.cuando);
+
+    let nuevoEstado = accion.estado;
 
     if (
       campo !== "estado" &&
       accion.estado === "Sin planificar" &&
-      tienePlanMinimo
+      planCompleto
     ) {
       nuevoEstado = "Pendiente";
     }
 
-    if (
-      campo === "estado"
-    ) {
+    if (campo === "estado") {
       nuevoEstado = valorLimpio;
     }
 
     const payload = {
-      [columnaDb]:
-        valorLimpio || null,
+      [columnaDb]: valorLimpio || null,
     };
 
-    if (
-      nuevoEstado !== accion.estado
-    ) {
-      payload.estado =
-        nuevoEstado;
+    if (nuevoEstado !== accion.estado) {
+      payload.estado = nuevoEstado;
     }
 
     if (
@@ -494,11 +271,9 @@ function PlanAccion() {
           ? {
               ...item,
               [campo]: valorLimpio,
-              estado:
-                nuevoEstado,
+              estado: nuevoEstado,
               fechaCierre:
-                nuevoEstado ===
-                "Terminada"
+                nuevoEstado === "Terminada"
                   ? new Date().toISOString()
                   : null,
             }
@@ -514,55 +289,29 @@ function PlanAccion() {
       .eq("id", accion.id);
 
     if (error) {
-      console.error(
-        "Error al actualizar celda:",
-        error
-      );
-
-      alert(
-        `No se pudo guardar el cambio.\n\n${error.message}`
-      );
-
+      console.error("Error al actualizar celda:", error);
+      alert(`No se pudo guardar el cambio.\n\n${error.message}`);
       await cargarAcciones();
     }
   }
 
-  function manejarTeclaEdicion(
-    event,
-    accion,
-    campo
-  ) {
-    if (
-      event.key === "Enter" &&
-      !event.shiftKey
-    ) {
+  function manejarTeclaEdicion(event, accion, campo) {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-
-      guardarCelda(
-        accion,
-        campo,
-        valorEdicion
-      );
+      guardarCelda(accion, campo, valorEdicion);
     }
 
-    if (
-      event.key === "Escape"
-    ) {
+    if (event.key === "Escape") {
       cancelarEdicion();
     }
   }
 
-  async function eliminarAccion(
-    accion
-  ) {
-    const confirmar =
-      window.confirm(
-        `¿Seguro que deseás eliminar esta acción?\n\n${accion.causa}\n\nEsta acción no se puede deshacer.`
-      );
+  async function eliminarAccion(accion) {
+    const confirmar = window.confirm(
+      `¿Seguro que deseás eliminar esta acción?\n\n${accion.causa}\n\nEsta acción no se puede deshacer.`
+    );
 
-    if (!confirmar) {
-      return;
-    }
+    if (!confirmar) return;
 
     const { error } = await supabase
       .from("plan_accion")
@@ -570,138 +319,18 @@ function PlanAccion() {
       .eq("id", accion.id);
 
     if (error) {
-      console.error(
-        "Error al eliminar acción:",
-        error
-      );
-
-      alert(
-        `No se pudo eliminar la acción.\n\n${error.message}`
-      );
-
+      console.error("Error al eliminar acción:", error);
+      alert(`No se pudo eliminar la acción.\n\n${error.message}`);
       return;
     }
 
     setAcciones((previous) =>
-      previous.filter(
-        (item) =>
-          item.id !== accion.id
-      )
+      previous.filter((item) => item.id !== accion.id)
     );
   }
 
-  function handleNuevaAccionChange(
-    event
-  ) {
-    const { name, value } =
-      event.target;
-
-    if (name === "maquina") {
-      const procesos = catalogo
-        .filter(
-          (item) =>
-            item.maquina === value
-        )
-        .map(
-          (item) => item.proceso
-        );
-
-      setNuevaAccion(
-        (previous) => ({
-          ...previous,
-          maquina: value,
-          proceso:
-            procesos.length === 1
-              ? procesos[0]
-              : "",
-        })
-      );
-
-      return;
-    }
-
-    setNuevaAccion(
-      (previous) => ({
-        ...previous,
-        [name]: value,
-      })
-    );
-  }
-
-  async function crearAccionManual(
-    event
-  ) {
-    event.preventDefault();
-
-    if (
-      !nuevaAccion.pilar
-    ) {
-      alert(
-        "Seleccioná el pilar."
-      );
-      return;
-    }
-
-    if (
-      !nuevaAccion.causa.trim()
-    ) {
-      alert(
-        "Ingresá la causa."
-      );
-      return;
-    }
-
-    setGuardando(true);
-
-    const { error } = await supabase
-      .from("plan_accion")
-      .insert({
-        origen: "Manual",
-        pilar:
-          nuevaAccion.pilar,
-        hallazgo:
-          nuevaAccion.causa.trim(),
-        que:
-          nuevaAccion.que.trim() ||
-          null,
-        como:
-          nuevaAccion.como.trim() ||
-          null,
-        responsable:
-          nuevaAccion.quien.trim() ||
-          null,
-        fecha_compromiso:
-          nuevaAccion.cuando ||
-          null,
-        estado:
-          nuevaAccion.estado ||
-          "Pendiente",
-        maquina:
-          nuevaAccion.maquina ||
-          null,
-        proceso:
-          nuevaAccion.proceso ||
-          null,
-        observaciones:
-          nuevaAccion.observaciones.trim() ||
-          null,
-      });
-
-    if (error) {
-      console.error(
-        "Error al crear acción:",
-        error
-      );
-
-      alert(
-        `No se pudo crear la acción.\n\n${error.message}`
-      );
-
-      setGuardando(false);
-      return;
-    }
-
-    setNuevaAccion({
+  function abrirNuevaFila() {
+    setNuevaFila({
       pilar: "",
       causa: "",
       que: "",
@@ -709,40 +338,82 @@ function PlanAccion() {
       quien: "",
       cuando: "",
       estado: "Pendiente",
-      maquina: "",
-      proceso: "",
-      observaciones: "",
     });
 
-    setMostrarNuevaAccion(false);
-    setGuardando(false);
+    setMostrandoNuevaFila(true);
+  }
+
+  function cancelarNuevaFila() {
+    setMostrandoNuevaFila(false);
+
+    setNuevaFila({
+      pilar: "",
+      causa: "",
+      que: "",
+      como: "",
+      quien: "",
+      cuando: "",
+      estado: "Pendiente",
+    });
+  }
+
+  function cambiarNuevaFila(campo, valor) {
+    setNuevaFila((previous) => ({
+      ...previous,
+      [campo]: valor,
+    }));
+  }
+
+  async function guardarNuevaFila() {
+    if (!nuevaFila.pilar) {
+      alert("Seleccioná el pilar.");
+      return;
+    }
+
+    if (!nuevaFila.causa.trim()) {
+      alert("Ingresá la causa.");
+      return;
+    }
+
+    setGuardandoNueva(true);
+
+    const { error } = await supabase
+      .from("plan_accion")
+      .insert({
+        origen: "Manual",
+        pilar: nuevaFila.pilar,
+        hallazgo: nuevaFila.causa.trim(),
+        que: nuevaFila.que.trim() || null,
+        como: nuevaFila.como.trim() || null,
+        responsable: nuevaFila.quien.trim() || null,
+        fecha_compromiso: nuevaFila.cuando || null,
+        estado: nuevaFila.estado || "Pendiente",
+        fecha_cierre:
+          nuevaFila.estado === "Terminada"
+            ? new Date().toISOString()
+            : null,
+      });
+
+    if (error) {
+      console.error("Error al crear acción:", error);
+      alert(`No se pudo crear la acción.\n\n${error.message}`);
+      setGuardandoNueva(false);
+      return;
+    }
+
+    setGuardandoNueva(false);
+    cancelarNuevaFila();
 
     await cargarAcciones();
   }
 
-  function getColorEstado(
-    estado
-  ) {
-    if (
-      estado === "Terminada"
-    ) {
-      return "#15803d";
-    }
-
-    if (
-      estado === "En proceso"
-    ) {
-      return "#d97706";
-    }
-
-    if (
-      estado === "Pendiente"
-    ) {
-      return "#dc2626";
-    }
-
-    return "#667085";
-  }
+  const cellBase = {
+    padding: "10px",
+    border: "1px solid #e5e7eb",
+    verticalAlign: "top",
+    fontSize: "12px",
+    background: "#fff",
+  };
 
   return (
     <>
@@ -762,562 +433,39 @@ function PlanAccion() {
           </h2>
 
           <p>
-            Editá directamente la matriz.
-            Hacé clic sobre una celda para modificarla.
+            Editá directamente la matriz haciendo clic sobre una celda.
           </p>
         </div>
 
         <button
           type="button"
           className="primary-button"
-          onClick={() =>
-            setMostrarNuevaAccion(
-              (previous) => !previous
-            )
+          onClick={
+            mostrandoNuevaFila
+              ? cancelarNuevaFila
+              : abrirNuevaFila
           }
         >
-          {mostrarNuevaAccion ? (
+          {mostrandoNuevaFila ? (
             <>
               <X size={18} />
-              Cerrar
+              Cancelar
             </>
           ) : (
             <>
               <Plus size={18} />
-              Nueva acción
+              Agregar acción
             </>
           )}
         </button>
       </header>
 
       <section
-        className="kpi-grid"
-        style={{
-          marginBottom: "14px",
-        }}
-      >
-        <div className="kpi-card">
-          <span>Sin planificar</span>
-          <strong>
-            {
-              indicadores.sinPlanificar
-            }
-          </strong>
-        </div>
-
-        <div className="kpi-card">
-          <span>Pendientes</span>
-          <strong>
-            {indicadores.pendientes}
-          </strong>
-        </div>
-
-        <div className="kpi-card">
-          <span>En proceso</span>
-          <strong>
-            {indicadores.enProceso}
-          </strong>
-        </div>
-
-        <div className="kpi-card">
-          <span>Terminadas</span>
-          <strong>
-            {indicadores.terminadas}
-          </strong>
-        </div>
-
-        <div className="kpi-card">
-          <span>Atrasadas</span>
-          <strong>
-            {indicadores.vencidas}
-          </strong>
-        </div>
-      </section>
-
-      {mostrarNuevaAccion && (
-        <section
-          className="section-block"
-          style={{
-            marginBottom: "14px",
-            padding: "16px",
-          }}
-        >
-          <div
-            className="section-heading"
-            style={{
-              marginBottom: "12px",
-            }}
-          >
-            <div>
-              <span className="eyebrow">
-                Registro manual
-              </span>
-
-              <h3>
-                Nueva acción
-              </h3>
-            </div>
-          </div>
-
-          <form
-            onSubmit={
-              crearAccionManual
-            }
-          >
-            <div
-              className="form-grid"
-              style={{
-                gap: "12px",
-              }}
-            >
-              <label className="form-field">
-                <span>Pilar</span>
-
-                <select
-                  name="pilar"
-                  value={
-                    nuevaAccion.pilar
-                  }
-                  onChange={
-                    handleNuevaAccionChange
-                  }
-                >
-                  <option value="">
-                    Seleccionar
-                  </option>
-
-                  {PILARES.map(
-                    (pilar) => (
-                      <option
-                        key={pilar}
-                        value={pilar}
-                      >
-                        {pilar}
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-
-              <label className="form-field">
-                <span>
-                  Máquina
-                </span>
-
-                <select
-                  name="maquina"
-                  value={
-                    nuevaAccion.maquina
-                  }
-                  onChange={
-                    handleNuevaAccionChange
-                  }
-                >
-                  <option value="">
-                    Opcional
-                  </option>
-
-                  {maquinas.map(
-                    (maquina) => (
-                      <option
-                        key={maquina}
-                        value={maquina}
-                      >
-                        {maquina}
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-
-              <label className="form-field">
-                <span>
-                  Proceso
-                </span>
-
-                <select
-                  name="proceso"
-                  value={
-                    nuevaAccion.proceso
-                  }
-                  onChange={
-                    handleNuevaAccionChange
-                  }
-                  disabled={
-                    !nuevaAccion.maquina
-                  }
-                >
-                  <option value="">
-                    Opcional
-                  </option>
-
-                  {procesosDisponibles.map(
-                    (proceso) => (
-                      <option
-                        key={proceso}
-                        value={proceso}
-                      >
-                        {proceso}
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-
-              <label className="form-field form-field-full">
-                <span>
-                  Causa
-                </span>
-
-                <input
-                  name="causa"
-                  value={
-                    nuevaAccion.causa
-                  }
-                  onChange={
-                    handleNuevaAccionChange
-                  }
-                />
-              </label>
-
-              <label className="form-field">
-                <span>Qué</span>
-
-                <input
-                  name="que"
-                  value={
-                    nuevaAccion.que
-                  }
-                  onChange={
-                    handleNuevaAccionChange
-                  }
-                />
-              </label>
-
-              <label className="form-field">
-                <span>Cómo</span>
-
-                <input
-                  name="como"
-                  value={
-                    nuevaAccion.como
-                  }
-                  onChange={
-                    handleNuevaAccionChange
-                  }
-                />
-              </label>
-
-              <label className="form-field">
-                <span>Quién</span>
-
-                <input
-                  name="quien"
-                  value={
-                    nuevaAccion.quien
-                  }
-                  onChange={
-                    handleNuevaAccionChange
-                  }
-                  list="responsables-plan-accion"
-                />
-
-                <datalist id="responsables-plan-accion">
-                  {responsables.map(
-                    (responsable) => (
-                      <option
-                        key={
-                          responsable
-                        }
-                        value={
-                          responsable
-                        }
-                      />
-                    )
-                  )}
-                </datalist>
-              </label>
-
-              <label className="form-field">
-                <span>Cuándo</span>
-
-                <input
-                  type="date"
-                  name="cuando"
-                  value={
-                    nuevaAccion.cuando
-                  }
-                  onChange={
-                    handleNuevaAccionChange
-                  }
-                />
-              </label>
-            </div>
-
-            <div
-              className="form-actions"
-              style={{
-                marginTop: "12px",
-              }}
-            >
-              <button
-                type="submit"
-                className="primary-button"
-                disabled={guardando}
-              >
-                <CheckCircle2
-                  size={17}
-                />
-
-                {guardando
-                  ? "Guardando..."
-                  : "Crear acción"}
-              </button>
-            </div>
-          </form>
-        </section>
-      )}
-
-      <section
         className="section-block"
         style={{
-          padding: "16px",
+          padding: "12px",
         }}
       >
-        <div
-          className="section-heading"
-          style={{
-            marginBottom: "12px",
-          }}
-        >
-          <div>
-            <span className="eyebrow">
-              Matriz principal
-            </span>
-
-            <h3>
-              Plan de Acción
-            </h3>
-          </div>
-
-          <p>
-            {accionesFiltradas.length} acciones visibles
-          </p>
-        </div>
-
-        <div
-          className="form-grid"
-          style={{
-            gap: "10px",
-            marginBottom: "10px",
-          }}
-        >
-          <label className="form-field">
-            <span>
-              <Search size={15} />
-              Buscar
-            </span>
-
-            <input
-              type="text"
-              name="busqueda"
-              value={
-                filtros.busqueda
-              }
-              onChange={
-                handleFiltroChange
-              }
-              placeholder="Causa, acción, responsable..."
-            />
-          </label>
-
-          <label className="form-field">
-            <span>
-              <User size={15} />
-              Responsable
-            </span>
-
-            <select
-              name="responsable"
-              value={
-                filtros.responsable
-              }
-              onChange={
-                handleFiltroChange
-              }
-            >
-              <option value="">
-                Todos
-              </option>
-
-              {responsables.map(
-                (responsable) => (
-                  <option
-                    key={
-                      responsable
-                    }
-                    value={
-                      responsable
-                    }
-                  >
-                    {
-                      responsable
-                    }
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>
-              <Workflow
-                size={15}
-              />
-              Pilar
-            </span>
-
-            <select
-              name="pilar"
-              value={
-                filtros.pilar
-              }
-              onChange={
-                handleFiltroChange
-              }
-            >
-              <option value="">
-                Todos
-              </option>
-
-              {PILARES.map(
-                (pilar) => (
-                  <option
-                    key={pilar}
-                    value={pilar}
-                  >
-                    {pilar}
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>
-              <Filter size={15} />
-              Estado
-            </span>
-
-            <select
-              name="estado"
-              value={
-                filtros.estado
-              }
-              onChange={
-                handleFiltroChange
-              }
-            >
-              <option value="">
-                Todos
-              </option>
-
-              <option value="Sin planificar">
-                Sin planificar
-              </option>
-
-              <option value="Pendiente">
-                Pendiente
-              </option>
-
-              <option value="En proceso">
-                En proceso
-              </option>
-
-              <option value="Terminada">
-                Terminada
-              </option>
-
-              <option value="Atrasadas">
-                Atrasadas
-              </option>
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>
-              <CalendarDays
-                size={15}
-              />
-              Período
-            </span>
-
-            <select
-              name="periodo"
-              value={
-                filtros.periodo
-              }
-              onChange={
-                handleFiltroChange
-              }
-            >
-              <option value="">
-                Todas
-              </option>
-
-              <option value="semana">
-                Semana
-              </option>
-
-              <option value="mes">
-                Mes
-              </option>
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>
-              <CalendarDays
-                size={15}
-              />
-              Fecha
-            </span>
-
-            <input
-              type="date"
-              name="fechaReferencia"
-              value={
-                filtros.fechaReferencia
-              }
-              onChange={
-                handleFiltroChange
-              }
-              disabled={
-                !filtros.periodo
-              }
-            />
-          </label>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            marginBottom: "10px",
-          }}
-        >
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={limpiarFiltros}
-            style={{
-              padding: "8px 12px",
-            }}
-          >
-            Limpiar filtros
-          </button>
-        </div>
-
         {loading ? (
           <div
             style={{
@@ -1332,533 +480,799 @@ function PlanAccion() {
             style={{
               width: "100%",
               overflowX: "auto",
-              minHeight: "460px",
+              minHeight: "520px",
             }}
           >
             <table
               style={{
                 width: "100%",
-                minWidth: "1280px",
-                borderCollapse:
-                  "collapse",
+                minWidth: "1320px",
+                borderCollapse: "collapse",
                 tableLayout: "fixed",
                 background: "#fff",
               }}
             >
               <thead>
                 <tr>
-                  {[
-                    ["Pilar", "140px"],
-                    ["Causa", "260px"],
-                    ["Qué", "230px"],
-                    ["Cómo", "260px"],
-                    ["Quién", "170px"],
-                    ["Cuándo", "140px"],
-                    ["Estado", "150px"],
-                    ["", "55px"],
-                  ].map(
-                    ([titulo, ancho]) => (
-                      <th
-                        key={
-                          titulo ||
-                          "acciones"
+                  <th
+                    style={{
+                      width: "150px",
+                      padding: "8px",
+                      textAlign: "left",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      color: "#344054",
+                      background: "#f8fafc",
+                      border: "1px solid #e5e7eb",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 3,
+                    }}
+                  >
+                    <div style={{ display: "grid", gap: "6px" }}>
+                      <span>Pilar</span>
+                      <select
+                        value={filtrosEncabezado.pilar}
+                        onChange={(event) =>
+                          setFiltrosEncabezado((previous) => ({
+                            ...previous,
+                            pilar: event.target.value,
+                          }))
                         }
                         style={{
-                          width: ancho,
-                          padding:
-                            "12px 10px",
-                          textAlign:
-                            "left",
-                          fontSize:
-                            "12px",
-                          fontWeight:
-                            800,
-                          color:
-                            "#344054",
-                          background:
-                            "#f8fafc",
-                          border:
-                            "1px solid #e5e7eb",
-                          position:
-                            "sticky",
-                          top: 0,
-                          zIndex: 3,
+                          width: "100%",
+                          minHeight: "30px",
+                          fontSize: "11px",
                         }}
                       >
-                        {titulo}
-                      </th>
-                    )
-                  )}
+                        <option value="">Todos</option>
+                        {PILARES.map((pilar) => (
+                          <option key={pilar} value={pilar}>
+                            {pilar}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+
+                  <th
+                    style={{
+                      width: "280px",
+                      padding: "12px 10px",
+                      textAlign: "left",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      color: "#344054",
+                      background: "#f8fafc",
+                      border: "1px solid #e5e7eb",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 3,
+                    }}
+                  >
+                    Causa
+                  </th>
+
+                  <th
+                    style={{
+                      width: "240px",
+                      padding: "12px 10px",
+                      textAlign: "left",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      color: "#344054",
+                      background: "#f8fafc",
+                      border: "1px solid #e5e7eb",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 3,
+                    }}
+                  >
+                    Qué
+                  </th>
+
+                  <th
+                    style={{
+                      width: "280px",
+                      padding: "12px 10px",
+                      textAlign: "left",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      color: "#344054",
+                      background: "#f8fafc",
+                      border: "1px solid #e5e7eb",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 3,
+                    }}
+                  >
+                    Cómo
+                  </th>
+
+                  <th
+                    style={{
+                      width: "180px",
+                      padding: "8px",
+                      textAlign: "left",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      color: "#344054",
+                      background: "#f8fafc",
+                      border: "1px solid #e5e7eb",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 3,
+                    }}
+                  >
+                    <div style={{ display: "grid", gap: "6px" }}>
+                      <span>Quién</span>
+                      <select
+                        value={filtrosEncabezado.quien}
+                        onChange={(event) =>
+                          setFiltrosEncabezado((previous) => ({
+                            ...previous,
+                            quien: event.target.value,
+                          }))
+                        }
+                        style={{
+                          width: "100%",
+                          minHeight: "30px",
+                          fontSize: "11px",
+                        }}
+                      >
+                        <option value="">Todos</option>
+                        {responsables.map((responsable) => (
+                          <option
+                            key={responsable}
+                            value={responsable}
+                          >
+                            {responsable}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+
+                  <th
+                    style={{
+                      width: "150px",
+                      padding: "8px",
+                      textAlign: "left",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      color: "#344054",
+                      background: "#f8fafc",
+                      border: "1px solid #e5e7eb",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 3,
+                    }}
+                  >
+                    <div style={{ display: "grid", gap: "6px" }}>
+                      <span>Cuándo</span>
+                      <input
+                        type="date"
+                        value={filtrosEncabezado.cuando}
+                        onChange={(event) =>
+                          setFiltrosEncabezado((previous) => ({
+                            ...previous,
+                            cuando: event.target.value,
+                          }))
+                        }
+                        style={{
+                          width: "100%",
+                          minHeight: "30px",
+                          fontSize: "11px",
+                        }}
+                      />
+                    </div>
+                  </th>
+
+                  <th
+                    style={{
+                      width: "160px",
+                      padding: "8px",
+                      textAlign: "left",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      color: "#344054",
+                      background: "#f8fafc",
+                      border: "1px solid #e5e7eb",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 3,
+                    }}
+                  >
+                    <div style={{ display: "grid", gap: "6px" }}>
+                      <span>Estado</span>
+                      <select
+                        value={filtrosEncabezado.estado}
+                        onChange={(event) =>
+                          setFiltrosEncabezado((previous) => ({
+                            ...previous,
+                            estado: event.target.value,
+                          }))
+                        }
+                        style={{
+                          width: "100%",
+                          minHeight: "30px",
+                          fontSize: "11px",
+                        }}
+                      >
+                        <option value="">Todos</option>
+                        <option value="Sin planificar">
+                          Sin planificar
+                        </option>
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="En proceso">En proceso</option>
+                        <option value="Terminada">Terminada</option>
+                        <option value="Atrasada">Atrasada</option>
+                      </select>
+                    </div>
+                  </th>
+
+                  <th
+                    style={{
+                      width: "90px",
+                      padding: "12px 10px",
+                      background: "#f8fafc",
+                      border: "1px solid #e5e7eb",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 3,
+                    }}
+                  />
                 </tr>
               </thead>
 
               <tbody>
-                {accionesFiltradas.map(
-                  (accion) => {
-                    const vencida =
-                      estaVencida(
-                        accion
-                      );
-
-                    return (
-                      <tr
-                        key={
-                          accion.id
+                {mostrandoNuevaFila && (
+                  <tr
+                    style={{
+                      background: "#f8fbff",
+                    }}
+                  >
+                    <td style={cellBase}>
+                      <select
+                        autoFocus
+                        value={nuevaFila.pilar}
+                        onChange={(event) =>
+                          cambiarNuevaFila(
+                            "pilar",
+                            event.target.value
+                          )
                         }
                         style={{
-                          background:
-                            vencida
-                              ? "#fffafa"
-                              : "#fff",
+                          width: "100%",
+                          minHeight: "38px",
+                          border: "1px solid #2563eb",
+                          borderRadius: "6px",
+                          padding: "6px",
                         }}
                       >
-                        {[
-                          "pilar",
-                          "causa",
-                          "que",
-                          "como",
-                          "quien",
-                          "cuando",
-                        ].map(
-                          (campo) => {
-                            const editando =
-                              editandoCelda?.id ===
-                                accion.id &&
-                              editandoCelda?.campo ===
-                                campo;
+                        <option value="">
+                          Seleccionar
+                        </option>
 
-                            const esFecha =
-                              campo ===
-                              "cuando";
+                        {PILARES.map((pilar) => (
+                          <option
+                            key={pilar}
+                            value={pilar}
+                          >
+                            {pilar}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
 
-                            const esLista =
-                              campo ===
-                                "pilar" ||
-                              campo ===
-                                "quien";
+                    <td style={cellBase}>
+                      <textarea
+                        value={nuevaFila.causa}
+                        onChange={(event) =>
+                          cambiarNuevaFila(
+                            "causa",
+                            event.target.value
+                          )
+                        }
+                        rows="3"
+                        placeholder="Causa..."
+                        style={{
+                          width: "100%",
+                          border: "1px solid #2563eb",
+                          borderRadius: "6px",
+                          padding: "6px",
+                          resize: "vertical",
+                          font: "inherit",
+                        }}
+                      />
+                    </td>
 
-                            return (
-                              <td
-                                key={
-                                  campo
-                                }
-                                onClick={() => {
-                                  if (
-                                    !editando
-                                  ) {
-                                    iniciarEdicion(
-                                      accion,
-                                      campo
-                                    );
-                                  }
-                                }}
-                                style={{
-                                  padding:
-                                    editando
-                                      ? "4px"
-                                      : "10px",
-                                  border:
-                                    "1px solid #e5e7eb",
-                                  verticalAlign:
-                                    "top",
-                                  fontSize:
-                                    "12px",
-                                  cursor:
-                                    "text",
-                                  minHeight:
-                                    "52px",
-                                  color:
-                                    campo ===
-                                      "cuando" &&
-                                    vencida
-                                      ? "#b91c1c"
-                                      : "#101828",
-                                  fontWeight:
-                                    campo ===
-                                      "cuando" &&
-                                    vencida
-                                      ? 800
-                                      : 500,
-                                }}
-                              >
-                                {editando ? (
-                                  esLista &&
-                                  campo ===
-                                    "pilar" ? (
-                                    <select
-                                      autoFocus
-                                      value={
-                                        valorEdicion
-                                      }
-                                      onChange={(
-                                        event
-                                      ) =>
-                                        setValorEdicion(
-                                          event
-                                            .target
-                                            .value
-                                        )
-                                      }
-                                      onBlur={() =>
-                                        guardarCelda(
-                                          accion,
-                                          campo,
-                                          valorEdicion
-                                        )
-                                      }
-                                      style={{
-                                        width:
-                                          "100%",
-                                        minHeight:
-                                          "38px",
-                                        border:
-                                          "1px solid #2563eb",
-                                        borderRadius:
-                                          "6px",
-                                      }}
-                                    >
-                                      {PILARES.map(
-                                        (
-                                          pilar
-                                        ) => (
-                                          <option
-                                            key={
-                                              pilar
-                                            }
-                                            value={
-                                              pilar
-                                            }
-                                          >
-                                            {
-                                              pilar
-                                            }
-                                          </option>
-                                        )
-                                      )}
-                                    </select>
-                                  ) : esLista &&
-                                    campo ===
-                                      "quien" ? (
-                                    <>
-                                      <input
-                                        autoFocus
-                                        value={
-                                          valorEdicion
-                                        }
-                                        onChange={(
-                                          event
-                                        ) =>
-                                          setValorEdicion(
-                                            event
-                                              .target
-                                              .value
-                                          )
-                                        }
-                                        onKeyDown={(
-                                          event
-                                        ) =>
-                                          manejarTeclaEdicion(
-                                            event,
-                                            accion,
-                                            campo
-                                          )
-                                        }
-                                        onBlur={() =>
-                                          guardarCelda(
-                                            accion,
-                                            campo,
-                                            valorEdicion
-                                          )
-                                        }
-                                        list="responsables-inline"
-                                        style={{
-                                          width:
-                                            "100%",
-                                          minHeight:
-                                            "38px",
-                                          border:
-                                            "1px solid #2563eb",
-                                          borderRadius:
-                                            "6px",
-                                          padding:
-                                            "6px",
-                                        }}
-                                      />
+                    <td style={cellBase}>
+                      <textarea
+                        value={nuevaFila.que}
+                        onChange={(event) =>
+                          cambiarNuevaFila(
+                            "que",
+                            event.target.value
+                          )
+                        }
+                        rows="3"
+                        placeholder="Qué..."
+                        style={{
+                          width: "100%",
+                          border: "1px solid #2563eb",
+                          borderRadius: "6px",
+                          padding: "6px",
+                          resize: "vertical",
+                          font: "inherit",
+                        }}
+                      />
+                    </td>
 
-                                      <datalist id="responsables-inline">
-                                        {responsables.map(
-                                          (
-                                            responsable
-                                          ) => (
-                                            <option
-                                              key={
-                                                responsable
-                                              }
-                                              value={
-                                                responsable
-                                              }
-                                            />
-                                          )
-                                        )}
-                                      </datalist>
-                                    </>
-                                  ) : esFecha ? (
-                                    <input
-                                      autoFocus
-                                      type="date"
-                                      value={
-                                        valorEdicion
-                                      }
-                                      onChange={(
-                                        event
-                                      ) =>
-                                        setValorEdicion(
-                                          event
-                                            .target
-                                            .value
-                                        )
-                                      }
-                                      onBlur={() =>
-                                        guardarCelda(
-                                          accion,
-                                          campo,
-                                          valorEdicion
-                                        )
-                                      }
-                                      style={{
-                                        width:
-                                          "100%",
-                                        minHeight:
-                                          "38px",
-                                        border:
-                                          "1px solid #2563eb",
-                                        borderRadius:
-                                          "6px",
-                                        padding:
-                                          "6px",
-                                      }}
-                                    />
-                                  ) : (
-                                    <textarea
-                                      autoFocus
-                                      value={
-                                        valorEdicion
-                                      }
-                                      onChange={(
-                                        event
-                                      ) =>
-                                        setValorEdicion(
-                                          event
-                                            .target
-                                            .value
-                                        )
-                                      }
-                                      onKeyDown={(
-                                        event
-                                      ) =>
-                                        manejarTeclaEdicion(
-                                          event,
-                                          accion,
-                                          campo
-                                        )
-                                      }
-                                      onBlur={() =>
-                                        guardarCelda(
-                                          accion,
-                                          campo,
-                                          valorEdicion
-                                        )
-                                      }
-                                      rows={
-                                        campo ===
-                                          "causa" ||
-                                        campo ===
-                                          "como"
-                                          ? 3
-                                          : 2
-                                      }
-                                      style={{
-                                        width:
-                                          "100%",
-                                        minHeight:
-                                          "48px",
-                                        border:
-                                          "1px solid #2563eb",
-                                        borderRadius:
-                                          "6px",
-                                        padding:
-                                          "6px",
-                                        resize:
-                                          "vertical",
-                                        font:
-                                          "inherit",
-                                      }}
-                                    />
-                                  )
-                                ) : (
-                                  <div
-                                    style={{
-                                      whiteSpace:
-                                        "pre-wrap",
-                                      lineHeight:
-                                        1.45,
-                                    }}
-                                  >
-                                    {campo ===
-                                    "cuando"
-                                      ? formatDate(
-                                          accion[
-                                            campo
-                                          ]
-                                        )
-                                      : accion[
-                                          campo
-                                        ] ||
-                                        "—"}
+                    <td style={cellBase}>
+                      <textarea
+                        value={nuevaFila.como}
+                        onChange={(event) =>
+                          cambiarNuevaFila(
+                            "como",
+                            event.target.value
+                          )
+                        }
+                        rows="3"
+                        placeholder="Cómo..."
+                        style={{
+                          width: "100%",
+                          border: "1px solid #2563eb",
+                          borderRadius: "6px",
+                          padding: "6px",
+                          resize: "vertical",
+                          font: "inherit",
+                        }}
+                      />
+                    </td>
 
-                                    {campo ===
-                                      "causa" &&
-                                      accion.origen ===
-                                        "Gemba" && (
-                                        <div
-                                          style={{
-                                            marginTop:
-                                              "6px",
-                                            fontSize:
-                                              "10px",
-                                            color:
-                                              "#667085",
-                                            fontWeight:
-                                              700,
-                                          }}
-                                        >
-                                          Gemba
-                                        </div>
-                                      )}
+                    <td style={cellBase}>
+                      <input
+                        value={nuevaFila.quien}
+                        onChange={(event) =>
+                          cambiarNuevaFila(
+                            "quien",
+                            event.target.value
+                          )
+                        }
+                        list="responsables-nueva-fila"
+                        placeholder="Responsable"
+                        style={{
+                          width: "100%",
+                          minHeight: "38px",
+                          border: "1px solid #2563eb",
+                          borderRadius: "6px",
+                          padding: "6px",
+                        }}
+                      />
 
-                                    {campo ===
-                                      "causa" &&
-                                      vencida && (
-                                        <div
-                                          style={{
-                                            marginTop:
-                                              "6px",
-                                            color:
-                                              "#b91c1c",
-                                            fontSize:
-                                              "10px",
-                                            fontWeight:
-                                              800,
-                                          }}
-                                        >
-                                          ATRASADA
-                                        </div>
-                                      )}
-                                  </div>
-                                )}
-                              </td>
-                            );
-                          }
-                        )}
+                      <datalist id="responsables-nueva-fila">
+                        {responsables.map((responsable) => (
+                          <option
+                            key={responsable}
+                            value={responsable}
+                          />
+                        ))}
+                      </datalist>
+                    </td>
 
-                        <td
+                    <td style={cellBase}>
+                      <input
+                        type="date"
+                        value={nuevaFila.cuando}
+                        onChange={(event) =>
+                          cambiarNuevaFila(
+                            "cuando",
+                            event.target.value
+                          )
+                        }
+                        style={{
+                          width: "100%",
+                          minHeight: "38px",
+                          border: "1px solid #2563eb",
+                          borderRadius: "6px",
+                          padding: "6px",
+                        }}
+                      />
+                    </td>
+
+                    <td style={cellBase}>
+                      <select
+                        value={nuevaFila.estado}
+                        onChange={(event) =>
+                          cambiarNuevaFila(
+                            "estado",
+                            event.target.value
+                          )
+                        }
+                        style={{
+                          width: "100%",
+                          minHeight: "38px",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "6px",
+                          background: "#fff",
+                          color: getColorEstado(
+                            nuevaFila.estado
+                          ),
+                          fontWeight: 800,
+                        }}
+                      >
+                        <option value="Pendiente">
+                          Pendiente
+                        </option>
+
+                        <option value="En proceso">
+                          En proceso
+                        </option>
+
+                        <option value="Terminada">
+                          Terminada
+                        </option>
+                      </select>
+                    </td>
+
+                    <td style={cellBase}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "6px",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="primary-button"
+                          onClick={guardarNuevaFila}
+                          disabled={guardandoNueva}
+                          title="Guardar nueva acción"
                           style={{
-                            padding:
-                              "6px",
-                            border:
-                              "1px solid #e5e7eb",
-                            verticalAlign:
-                              "top",
+                            minWidth: "38px",
+                            padding: "8px",
                           }}
                         >
-                          <select
-                            value={
-                              accion.estado
-                            }
-                            onChange={(
-                              event
-                            ) =>
-                              guardarCelda(
-                                accion,
-                                "estado",
-                                event
-                                  .target
-                                  .value
-                              )
-                            }
+                          <CheckCircle2 size={16} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={cancelarNuevaFila}
+                          title="Cancelar"
+                          style={{
+                            minWidth: "38px",
+                            padding: "8px",
+                          }}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {accionesVisibles.map((accion) => {
+                  const atrasada =
+                    estaAtrasada(accion);
+
+                  const estadoMostrado =
+                    estadoVisual(accion);
+
+                  return (
+                    <tr
+                      key={accion.id}
+                      style={{
+                        background: atrasada
+                          ? "#fffafa"
+                          : "#fff",
+                      }}
+                    >
+                      {[
+                        "pilar",
+                        "causa",
+                        "que",
+                        "como",
+                        "quien",
+                        "cuando",
+                      ].map((campo) => {
+                        const editando =
+                          editandoCelda?.id === accion.id &&
+                          editandoCelda?.campo === campo;
+
+                        const esFecha =
+                          campo === "cuando";
+
+                        return (
+                          <td
+                            key={campo}
+                            onClick={() => {
+                              if (!editando) {
+                                iniciarEdicion(
+                                  accion,
+                                  campo
+                                );
+                              }
+                            }}
                             style={{
-                              width:
-                                "100%",
-                              minHeight:
-                                "36px",
-                              border:
-                                "1px solid #e5e7eb",
-                              borderRadius:
-                                "6px",
-                              background:
-                                "#fff",
+                              ...cellBase,
+                              padding: editando
+                                ? "4px"
+                                : "10px",
+                              cursor: "text",
                               color:
-                                getColorEstado(
-                                  accion.estado
-                                ),
+                                campo === "cuando" &&
+                                atrasada
+                                  ? "#b91c1c"
+                                  : "#101828",
                               fontWeight:
-                                800,
-                              fontSize:
-                                "12px",
-                              cursor:
-                                "pointer",
+                                campo === "cuando" &&
+                                atrasada
+                                  ? 800
+                                  : 500,
                             }}
                           >
-                            {ESTADOS.map(
-                              (
-                                estado
-                              ) => (
-                                <option
-                                  key={
-                                    estado
+                            {editando ? (
+                              campo === "pilar" ? (
+                                <select
+                                  autoFocus
+                                  value={valorEdicion}
+                                  onChange={(event) =>
+                                    setValorEdicion(
+                                      event.target.value
+                                    )
                                   }
-                                  value={
-                                    estado
+                                  onBlur={() =>
+                                    guardarCelda(
+                                      accion,
+                                      campo,
+                                      valorEdicion
+                                    )
                                   }
+                                  style={{
+                                    width: "100%",
+                                    minHeight: "38px",
+                                    border:
+                                      "1px solid #2563eb",
+                                    borderRadius: "6px",
+                                  }}
                                 >
-                                  {estado}
-                                </option>
-                              )
-                            )}
-                          </select>
-                        </td>
+                                  {PILARES.map((pilar) => (
+                                    <option
+                                      key={pilar}
+                                      value={pilar}
+                                    >
+                                      {pilar}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : campo === "quien" ? (
+                                <>
+                                  <input
+                                    autoFocus
+                                    value={valorEdicion}
+                                    onChange={(event) =>
+                                      setValorEdicion(
+                                        event.target.value
+                                      )
+                                    }
+                                    onKeyDown={(event) =>
+                                      manejarTeclaEdicion(
+                                        event,
+                                        accion,
+                                        campo
+                                      )
+                                    }
+                                    onBlur={() =>
+                                      guardarCelda(
+                                        accion,
+                                        campo,
+                                        valorEdicion
+                                      )
+                                    }
+                                    list="responsables-inline"
+                                    style={{
+                                      width: "100%",
+                                      minHeight: "38px",
+                                      border:
+                                        "1px solid #2563eb",
+                                      borderRadius: "6px",
+                                      padding: "6px",
+                                    }}
+                                  />
 
-                        <td
+                                  <datalist id="responsables-inline">
+                                    {responsables.map(
+                                      (responsable) => (
+                                        <option
+                                          key={responsable}
+                                          value={responsable}
+                                        />
+                                      )
+                                    )}
+                                  </datalist>
+                                </>
+                              ) : esFecha ? (
+                                <input
+                                  autoFocus
+                                  type="date"
+                                  value={valorEdicion}
+                                  onChange={(event) =>
+                                    setValorEdicion(
+                                      event.target.value
+                                    )
+                                  }
+                                  onBlur={() =>
+                                    guardarCelda(
+                                      accion,
+                                      campo,
+                                      valorEdicion
+                                    )
+                                  }
+                                  style={{
+                                    width: "100%",
+                                    minHeight: "38px",
+                                    border:
+                                      "1px solid #2563eb",
+                                    borderRadius: "6px",
+                                    padding: "6px",
+                                  }}
+                                />
+                              ) : (
+                                <textarea
+                                  autoFocus
+                                  value={valorEdicion}
+                                  onChange={(event) =>
+                                    setValorEdicion(
+                                      event.target.value
+                                    )
+                                  }
+                                  onKeyDown={(event) =>
+                                    manejarTeclaEdicion(
+                                      event,
+                                      accion,
+                                      campo
+                                    )
+                                  }
+                                  onBlur={() =>
+                                    guardarCelda(
+                                      accion,
+                                      campo,
+                                      valorEdicion
+                                    )
+                                  }
+                                  rows={
+                                    campo === "causa" ||
+                                    campo === "como"
+                                      ? 3
+                                      : 2
+                                  }
+                                  style={{
+                                    width: "100%",
+                                    minHeight: "48px",
+                                    border:
+                                      "1px solid #2563eb",
+                                    borderRadius: "6px",
+                                    padding: "6px",
+                                    resize: "vertical",
+                                    font: "inherit",
+                                  }}
+                                />
+                              )
+                            ) : (
+                              <div
+                                style={{
+                                  whiteSpace: "pre-wrap",
+                                  lineHeight: 1.45,
+                                }}
+                              >
+                                {campo === "cuando"
+                                  ? formatDate(
+                                      accion[campo]
+                                    )
+                                  : accion[campo] || "—"}
+
+                                {campo === "causa" &&
+                                  accion.origen ===
+                                    "Gemba" && (
+                                    <div
+                                      style={{
+                                        marginTop: "6px",
+                                        fontSize: "10px",
+                                        color: "#667085",
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      Gemba
+                                    </div>
+                                  )}
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+
+                      <td
+                        style={{
+                          ...cellBase,
+                          padding: "6px",
+                        }}
+                      >
+                        <select
+                          value={
+                            atrasada
+                              ? accion.estado
+                              : accion.estado
+                          }
+                          onChange={(event) =>
+                            guardarCelda(
+                              accion,
+                              "estado",
+                              event.target.value
+                            )
+                          }
                           style={{
-                            padding:
-                              "6px",
+                            width: "100%",
+                            minHeight: "36px",
                             border:
                               "1px solid #e5e7eb",
-                            verticalAlign:
-                              "top",
-                            textAlign:
-                              "center",
+                            borderRadius: "6px",
+                            background: "#fff",
+                            color: getColorEstado(
+                              estadoMostrado
+                            ),
+                            fontWeight: 800,
+                            fontSize: "12px",
+                            cursor: "pointer",
                           }}
                         >
-                          <button
-                            type="button"
-                            className="icon-delete-button"
-                            onClick={() =>
-                              eliminarAccion(
-                                accion
-                              )
-                            }
-                            title="Eliminar acción"
-                          >
-                            <Trash2
-                              size={16}
-                            />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  }
-                )}
+                          {accion.estado ===
+                            "Sin planificar" && (
+                            <option value="Sin planificar">
+                              Sin planificar
+                            </option>
+                          )}
+
+                          <option value="Pendiente">
+                            {atrasada
+                              ? "Atrasada"
+                              : "Pendiente"}
+                          </option>
+
+                          <option value="En proceso">
+                            En proceso
+                          </option>
+
+                          <option value="Terminada">
+                            Terminada
+                          </option>
+                        </select>
+                      </td>
+
+                      <td
+                        style={{
+                          ...cellBase,
+                          padding: "6px",
+                          textAlign: "center",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="icon-delete-button"
+                          onClick={() =>
+                            eliminarAccion(accion)
+                          }
+                          title="Eliminar acción"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
