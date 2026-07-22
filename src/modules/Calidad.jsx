@@ -10,18 +10,27 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-function Calidad({ gembaData, onBack, onComplete }) {
+function Calidad({
+  gembaData,
+  initialData,
+  onBack,
+  onComplete,
+}) {
   const [activeSection, setActiveSection] = useState("producto");
 
-  const [producto, setProducto] = useState({
-    existenDesvios: "",
-    hallazgos: [],
-  });
+  const [producto, setProducto] = useState(
+    initialData?.producto || {
+      existenDesvios: "",
+      hallazgos: [],
+    }
+  );
 
-  const [controlProceso, setControlProceso] = useState({
-    controlesCorrectos: "",
-    hallazgos: [],
-  });
+  const [controlProceso, setControlProceso] = useState(
+    initialData?.controlProceso || {
+      controlesCorrectos: "",
+      hallazgos: [],
+    }
+  );
 
   const [nuevoHallazgoProducto, setNuevoHallazgoProducto] = useState({
     descripcion: "",
