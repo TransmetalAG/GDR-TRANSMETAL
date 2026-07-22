@@ -123,6 +123,7 @@ function GestionMantenimiento() {
     diaProgramado: "",
     tiempoEstimado: "",
     prioridad: "Media",
+    estado: "Pendiente de asignación",
     observaciones: "",
   });
 
@@ -306,6 +307,7 @@ function GestionMantenimiento() {
       diaProgramado: "",
       tiempoEstimado: "",
       prioridad: "Media",
+      estado: "Pendiente de asignación",
       observaciones: "",
     });
 
@@ -328,6 +330,7 @@ function GestionMantenimiento() {
       tiempoEstimado:
         tarea.tiempoEstimado === "" ? "" : String(tarea.tiempoEstimado),
       prioridad: tarea.prioridad,
+      estado: tarea.estado || "Pendiente de asignación",
       observaciones: tarea.observaciones || "",
     });
 
@@ -437,7 +440,11 @@ function GestionMantenimiento() {
       dia_programado: nuevaTarea.diaProgramado,
       tiempo_estimado_horas: horas,
       prioridad: nuevaTarea.prioridad,
-      estado: "Asignada",
+      estado: modoEdicion
+        ? nuevaTarea.estado
+        : nuevaTarea.estado === "Pendiente de asignación"
+          ? "Asignada"
+          : nuevaTarea.estado,
       origen: modoEdicion
         ? tareas.find((item) => item.id === modoEdicion)?.origen || "Manual"
         : "Manual",
@@ -920,6 +927,35 @@ function GestionMantenimiento() {
 
                   <option value="Crítica">
                     Crítica
+                  </option>
+                </select>
+              </label>
+
+              <label className="form-field">
+                <span>
+                  <Filter size={17} />
+                  Estado
+                </span>
+
+                <select
+                  name="estado"
+                  value={nuevaTarea.estado}
+                  onChange={handleNuevaTareaChange}
+                >
+                  <option value="Pendiente de asignación">
+                    Pendiente de asignación
+                  </option>
+
+                  <option value="Asignada">
+                    Asignada
+                  </option>
+
+                  <option value="En proceso">
+                    En proceso
+                  </option>
+
+                  <option value="Terminada">
+                    Terminada
                   </option>
                 </select>
               </label>
