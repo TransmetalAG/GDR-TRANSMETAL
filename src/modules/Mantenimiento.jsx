@@ -9,9 +9,19 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-function Mantenimiento({ gembaData, onBack, onComplete }) {
-  const [existenAnomalias, setExistenAnomalias] = useState("");
-  const [hallazgos, setHallazgos] = useState([]);
+function Mantenimiento({
+  gembaData,
+  initialData,
+  onBack,
+  onComplete,
+}) {
+  const [existenAnomalias, setExistenAnomalias] = useState(
+    initialData?.existenAnomalias || ""
+  );
+
+  const [hallazgos, setHallazgos] = useState(
+    initialData?.hallazgos || []
+  );
 
   const [nuevaAnomalia, setNuevaAnomalia] = useState({
     descripcion: "",
@@ -184,6 +194,7 @@ function Mantenimiento({ gembaData, onBack, onComplete }) {
               onClick={() => {
                 setExistenAnomalias("no");
                 setHallazgos([]);
+
                 setNuevaAnomalia({
                   descripcion: "",
                   prioridad: "Media",
@@ -245,9 +256,18 @@ function Mantenimiento({ gembaData, onBack, onComplete }) {
                       }))
                     }
                   >
-                    <option value="Baja">Baja</option>
-                    <option value="Media">Media</option>
-                    <option value="Alta">Alta</option>
+                    <option value="Baja">
+                      Baja
+                    </option>
+
+                    <option value="Media">
+                      Media
+                    </option>
+
+                    <option value="Alta">
+                      Alta
+                    </option>
+
                     <option value="Crítica">
                       Crítica
                     </option>
@@ -300,14 +320,18 @@ function Mantenimiento({ gembaData, onBack, onComplete }) {
                     <div className="finding-item-content">
                       <div className="finding-item-top">
                         <div>
-                          <p>{hallazgo.descripcion}</p>
+                          <p>
+                            {hallazgo.descripcion}
+                          </p>
                         </div>
 
                         <button
                           type="button"
                           className="icon-delete-button"
                           onClick={() =>
-                            eliminarAnomalia(hallazgo.id)
+                            eliminarAnomalia(
+                              hallazgo.id
+                            )
                           }
                         >
                           <Trash2 size={17} />
