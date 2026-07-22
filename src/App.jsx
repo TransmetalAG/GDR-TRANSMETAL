@@ -549,6 +549,7 @@ function App() {
           !showGembaSummary && (
             <Seguridad
               gembaData={gembaData}
+              initialData={moduleResults.seguridad}
               onBack={() =>
                 setActiveGembaModule(null)
               }
@@ -565,6 +566,7 @@ function App() {
           !showGembaSummary && (
             <Calidad
               gembaData={gembaData}
+              initialData={moduleResults.calidad}
               onBack={() =>
                 setActiveGembaModule(null)
               }
@@ -581,6 +583,7 @@ function App() {
           !showGembaSummary && (
             <Proceso
               gembaData={gembaData}
+              initialData={moduleResults.proceso}
               onBack={() =>
                 setActiveGembaModule(null)
               }
@@ -597,6 +600,7 @@ function App() {
           !showGembaSummary && (
             <Mantenimiento
               gembaData={gembaData}
+              initialData={moduleResults.mantenimiento}
               onBack={() =>
                 setActiveGembaModule(null)
               }
