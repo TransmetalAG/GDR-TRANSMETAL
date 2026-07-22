@@ -27,6 +27,7 @@ import Proceso from "./modules/Proceso.jsx";
 import Mantenimiento from "./modules/Mantenimiento.jsx";
 
 import ResumenGemba from "./components/ResumenGemba.jsx";
+import { supabase } from "./lib/supabase.js";
 
 function App() {
   const [currentPage, setCurrentPage] = useState("dashboard");
@@ -346,20 +347,38 @@ function App() {
     });
   }
 
-  function handleConfirmGemba() {
-    /*
-      Más adelante, aquí guardaremos el Gemba
-      completo en la base de datos.
+  async function handleConfirmGemba() {
+    const { error } = await supabase
+      .from("gembas")
+      .insert({
+        fecha: new Date().toISOString(),
+        maquina: gembaData.maquina,
+        proceso: gembaData.proceso,
+        colaborador: gembaData.collaborator,
+        tarea: gembaData.task,
+        auditor: gembaData.auditor,
+        estado: "Finalizado",
+        seguridad: moduleResults.seguridad,
+        calidad: moduleResults.calidad,
+        proceso_resultado: moduleResults.proceso,
+        mantenimiento: moduleResults.mantenimiento,
+      });
 
-      También será el punto donde:
-      - los hallazgos alimentarán Plan de Acción
-      - las anomalías técnicas alimentarán
-        Mantenimiento
-      - se generarán tareas para responsables
-    */
+    if (error) {
+      console.error(
+        "Error al guardar el Gemba:",
+        error
+      );
+
+      alert(
+        `No se pudo guardar el Gemba. No se perdió la información.\n\n${error.message}`
+      );
+
+      return;
+    }
 
     alert(
-      "Gemba finalizado correctamente."
+      "Gemba guardado y finalizado correctamente."
     );
 
     setGembaStarted(false);
