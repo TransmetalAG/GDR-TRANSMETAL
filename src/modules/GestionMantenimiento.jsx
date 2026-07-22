@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   ClipboardList,
-  Save,
   Pencil,
   X,
 } from "lucide-react";
@@ -98,7 +97,15 @@ function GestionMantenimiento() {
   );
 
   const [tareas, setTareas] = useState([]);
-  const [capacidades, setCapacidades] = useState({});
+
+  // Referencia temporal para validar la carga semanal.
+  // No se guarda en Supabase y vuelve a 40 h al recargar la app.
+  const [capacidadSemanal, setCapacidadSemanal] = useState({
+    "Edvin Telles": CAPACIDAD_DEFAULT,
+    "Carlos Carcuz": CAPACIDAD_DEFAULT,
+    "Erwin Haz": CAPACIDAD_DEFAULT,
+    "Anderson López": CAPACIDAD_DEFAULT,
+  });
 
   const [filtros, setFiltros] = useState({
     responsable: "",
@@ -149,36 +156,13 @@ function GestionMantenimiento() {
       .filter((row) => row.tipo_registro === "tarea")
       .map(normalizarTarea);
 
-    const capacidadesDb = {};
-
-    registros
-      .filter((row) => row.tipo_registro === "capacidad")
-      .forEach((row) => {
-        const key = `${row.responsable}__${row.semana_inicio}`;
-
-        capacidadesDb[key] = {
-          id: row.id,
-          responsable: row.responsable,
-          semanaInicio: row.semana_inicio,
-          horasDisponibles: Number(row.horas_disponibles || CAPACIDAD_DEFAULT),
-        };
-      });
-
     setTareas(tareasDb);
-    setCapacidades(capacidadesDb);
     setLoading(false);
   }
 
-  function getCapacidadKey(responsable, semanaInicio) {
-    return `${responsable}__${semanaInicio}`;
-  }
-
-  function getHorasDisponibles(responsable, semanaInicio) {
-    const key = getCapacidadKey(responsable, semanaInicio);
-
-    return (
-      capacidades[key]?.horasDisponibles ??
-      CAPACIDAD_DEFAULT
+  function getHorasDisponibles(responsable) {
+    return Number(
+      capacidadSemanal[responsable] ?? CAPACIDAD_DEFAULT
     );
   }
 
@@ -204,10 +188,7 @@ function GestionMantenimiento() {
 
   const resumenCapacidad = useMemo(() => {
     return TECNICOS.map((tecnico) => {
-      const horasDisponibles = getHorasDisponibles(
-        tecnico,
-        semanaSeleccionada
-      );
+      const horasDisponibles = getHorasDisponibles(tecnico);
 
       const maximoProgramable =
         horasDisponibles * PORCENTAJE_PROGRAMABLE;
@@ -241,7 +222,7 @@ function GestionMantenimiento() {
         sobreProgramado: horasProgramadas > maximoProgramable,
       };
     });
-  }, [capacidades, tareas, semanaSeleccionada]);
+  }, [capacidadSemanal, tareas, semanaSeleccionada]);
 
   const tareasFiltradas = useMemo(() => {
     return tareas.filter((tarea) => {
@@ -375,8 +356,7 @@ function GestionMantenimiento() {
     const semanaInicio = getMonday(nuevaTarea.diaProgramado);
 
     const horasDisponibles = getHorasDisponibles(
-      nuevaTarea.responsable,
-      semanaInicio
+      nuevaTarea.responsable
     );
 
     const maximoProgramable =
@@ -494,62 +474,12 @@ function GestionMantenimiento() {
     await cargarDatos();
   }
 
-  async function guardarCapacidad(tecnico, horasDisponibles) {
-    const horas = Number(horasDisponibles);
-
-    if (!Number.isFinite(horas) || horas < 0) {
-      alert("Ingresá una capacidad semanal válida.");
-      return;
-    }
-
-    const key = getCapacidadKey(tecnico, semanaSeleccionada);
-    const registroExistente = capacidades[key];
-
-    const payload = {
-      tipo_registro: "capacidad",
-      responsable: tecnico,
-      semana_inicio: semanaSeleccionada,
-      horas_disponibles: horas,
-    };
-
-    let error;
-
-    if (registroExistente?.id) {
-      const response = await supabase
-        .from("mantenimiento")
-        .update(payload)
-        .eq("id", registroExistente.id);
-
-      error = response.error;
-    } else {
-      const response = await supabase
-        .from("mantenimiento")
-        .insert(payload);
-
-      error = response.error;
-    }
-
-    if (error) {
-      console.error("Error al guardar capacidad:", error);
-      alert(`No se pudo guardar la capacidad.\n\n${error.message}`);
-      return;
-    }
-
-    await cargarDatos();
-  }
-
   function actualizarCapacidadLocal(tecnico, value) {
-    const key = getCapacidadKey(tecnico, semanaSeleccionada);
     const horas = value === "" ? "" : Number(value);
 
-    setCapacidades((previous) => ({
+    setCapacidadSemanal((previous) => ({
       ...previous,
-      [key]: {
-        ...(previous[key] || {}),
-        responsable: tecnico,
-        semanaInicio: semanaSeleccionada,
-        horasDisponibles: horas,
-      },
+      [tecnico]: horas,
     }));
   }
 
@@ -594,6 +524,17 @@ function GestionMantenimiento() {
             <h3>
               Programación por técnico
             </h3>
+
+            <p
+              style={{
+                margin: "8px 0 0",
+                color: "#667085",
+                fontSize: "12px",
+              }}
+            >
+              La capacidad es solo una referencia temporal para controlar
+              el límite del 80%; no se guarda en Supabase.
+            </p>
           </div>
 
           <label
@@ -617,14 +558,8 @@ function GestionMantenimiento() {
 
         <div className="kpi-grid">
           {resumenCapacidad.map((item) => {
-            const key = getCapacidadKey(
-              item.tecnico,
-              semanaSeleccionada
-            );
-
             const valorEditable =
-              capacidades[key]?.horasDisponibles ??
-              CAPACIDAD_DEFAULT;
+              capacidadSemanal[item.tecnico] ?? CAPACIDAD_DEFAULT;
 
             return (
               <article
@@ -637,16 +572,10 @@ function GestionMantenimiento() {
 
                 <div
                   style={{
-                    display: "flex",
-                    gap: "8px",
-                    alignItems: "end",
                     marginTop: "12px",
                   }}
                 >
-                  <label
-                    className="form-field"
-                    style={{ flex: 1 }}
-                  >
+                  <label className="form-field">
                     <span>
                       Capacidad semanal
                     </span>
@@ -663,25 +592,16 @@ function GestionMantenimiento() {
                         )
                       }
                     />
-                  </label>
 
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() =>
-                      guardarCapacidad(
-                        item.tecnico,
-                        valorEditable
-                      )
-                    }
-                    title="Guardar capacidad"
-                    style={{
-                      minWidth: "44px",
-                      padding: "12px",
-                    }}
-                  >
-                    <Save size={17} />
-                  </button>
+                    <small
+                      style={{
+                        marginTop: "6px",
+                        color: "#98a2b3",
+                      }}
+                    >
+                      Valor temporal para validar la programación.
+                    </small>
+                  </label>
                 </div>
 
                 <div
