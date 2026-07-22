@@ -14,6 +14,7 @@ import {
   Pencil,
   X,
   Trash2,
+  ChevronDown,
 } from "lucide-react";
 
 import { catalogo } from "../data/CatalogoMaquinas.js";
@@ -92,6 +93,7 @@ function GestionMantenimiento() {
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [modoEdicion, setModoEdicion] = useState(null);
+  const [estadoAbiertoId, setEstadoAbiertoId] = useState(null);
 
   const [semanaSeleccionada, setSemanaSeleccionada] = useState(
     getMonday(new Date())
@@ -1384,45 +1386,135 @@ function GestionMantenimiento() {
                       {tarea.prioridad}
                     </span>
 
-                    <select
-                      value={tarea.estado}
-                      onChange={(event) =>
-                        cambiarEstadoDirecto(
-                          tarea.id,
-                          event.target.value
-                        )
-                      }
-                      aria-label={`Cambiar estado de ${tarea.tarea}`}
-                      title="Cambiar estado"
+                    <div
                       style={{
-                        ...getEstiloEstado(tarea.estado),
-                           borderRadius: "999px",
-                            padding: "5px 26px 5px 12px",
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            outline: "none",
-                           width: "175px",
-                           textAlign: "center",
-                           textAlignLast: "center",                   
+                        position: "relative",
+                        width: "190px",
+                        flexShrink: 0,
                       }}
                     >
-                      <option value="Pendiente de asignación">
-                        Pendiente de asignación
-                      </option>
+                      <button
+                        type="button"
+                        aria-haspopup="listbox"
+                        aria-expanded={estadoAbiertoId === tarea.id}
+                        aria-label={`Cambiar estado de ${tarea.tarea}`}
+                        title="Cambiar estado"
+                        onClick={() =>
+                          setEstadoAbiertoId((previous) =>
+                            previous === tarea.id ? null : tarea.id
+                          )
+                        }
+                        style={{
+                          ...getEstiloEstado(tarea.estado),
+                          width: "190px",
+                          minHeight: "36px",
+                          borderRadius: "999px",
+                          padding: "6px 34px 6px 16px",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          outline: "none",
+                          position: "relative",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          textAlign: "center",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: "100%",
+                            textAlign: "center",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {tarea.estado}
+                        </span>
 
-                      <option value="Asignada">
-                        Asignada
-                      </option>
+                        <ChevronDown
+                          size={16}
+                          style={{
+                            position: "absolute",
+                            right: "11px",
+                            top: "50%",
+                            transform:
+                              estadoAbiertoId === tarea.id
+                                ? "translateY(-50%) rotate(180deg)"
+                                : "translateY(-50%)",
+                            transition: "transform 0.15s ease",
+                          }}
+                        />
+                      </button>
 
-                      <option value="En proceso">
-                        En proceso
-                      </option>
+                      {estadoAbiertoId === tarea.id && (
+                        <div
+                          role="listbox"
+                          aria-label={`Estados disponibles para ${tarea.tarea}`}
+                          style={{
+                            position: "absolute",
+                            top: "calc(100% + 6px)",
+                            left: 0,
+                            width: "190px",
+                            zIndex: 50,
+                            background: "white",
+                            border: "1px solid #dfe4ea",
+                            borderRadius: "12px",
+                            boxShadow: "0 12px 30px rgba(15, 23, 42, 0.14)",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {[
+                            "Pendiente de asignación",
+                            "Asignada",
+                            "En proceso",
+                            "Terminada",
+                          ].map((estado) => {
+                            const seleccionado = tarea.estado === estado;
 
-                      <option value="Terminada">
-                        Terminada
-                      </option>
-                    </select>
+                            return (
+                              <button
+                                key={estado}
+                                type="button"
+                                role="option"
+                                aria-selected={seleccionado}
+                                onClick={async () => {
+                                  setEstadoAbiertoId(null);
+
+                                  if (!seleccionado) {
+                                    await cambiarEstadoDirecto(
+                                      tarea.id,
+                                      estado
+                                    );
+                                  }
+                                }}
+                                style={{
+                                  width: "100%",
+                                  border: 0,
+                                  borderBottom:
+                                    estado !== "Terminada"
+                                      ? "1px solid #eef2f7"
+                                      : "none",
+                                  padding: "10px 12px",
+                                  background: seleccionado
+                                    ? getEstiloEstado(estado).background
+                                    : "white",
+                                  color: getEstiloEstado(estado).color,
+                                  fontSize: "12px",
+                                  fontWeight: seleccionado ? 800 : 700,
+                                  cursor: "pointer",
+                                  textAlign: "center",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                {estado}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
 
                     <span className="status-pill">
                       Origen: {tarea.origen}
