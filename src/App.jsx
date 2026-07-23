@@ -441,10 +441,11 @@ function App() {
 
   async function handleConfirmGemba() {
     /*
-      1. Guardamos el Gemba y recuperamos su ID.
-      2. Si el pilar de Mantenimiento tiene anomalías,
-         creamos automáticamente una tarea por cada hallazgo.
-      3. Solo limpiamos el Gemba cuando todo termina correctamente.
+      Flujo al finalizar:
+      1. Guarda el Gemba.
+      2. Seguridad + Calidad + Proceso -> Plan de Acción.
+      3. Mantenimiento -> Gestión de Mantenimiento.
+      4. Conserva trazabilidad con gemba_id.
     */
 
     const { data: gembaGuardado, error: gembaError } =
@@ -467,16 +468,129 @@ function App() {
         .single();
 
     if (gembaError) {
-      console.error(
-        "Error al guardar el Gemba:",
-        gembaError
-      );
-
+      console.error("Error al guardar el Gemba:", gembaError);
       alert(
         `No se pudo guardar el Gemba. No se perdió la información.\n\n${gembaError.message}`
       );
-
       return;
+    }
+
+    const accionesPlan = [];
+    const baseAccion = {
+      equipo: gembaData.maquina,
+      que: null,
+      como: null,
+      quien: null,
+      cuando: null,
+      estado: "Sin planificar",
+      origen: "Gemba",
+      gemba_id: gembaGuardado.id,
+    };
+
+    // SEGURIDAD: condiciones físicas
+    (moduleResults.seguridad?.condiciones?.hallazgos || []).forEach(
+      (hallazgo) => {
+        accionesPlan.push({
+          ...baseAccion,
+          pilar: "Seguridad",
+          causa: hallazgo.descripcion?.trim() || "Hallazgo de seguridad",
+        });
+      }
+    );
+
+    // SEGURIDAD: comportamientos
+    (moduleResults.seguridad?.comportamiento?.hallazgos || []).forEach(
+      (hallazgo) => {
+        accionesPlan.push({
+          ...baseAccion,
+          pilar: "Seguridad",
+          causa: hallazgo.descripcion?.trim() || "Hallazgo de comportamiento",
+        });
+      }
+    );
+
+    // SEGURIDAD: desviación de procedimiento
+    const procedimiento = moduleResults.seguridad?.procedimientos;
+    if (procedimiento?.existeProcedimiento === "si") {
+      const hayDesviacion =
+        procedimiento?.cumpleProcedimiento === "no" ||
+        procedimiento?.hayDesviacion === "si";
+
+      if (hayDesviacion) {
+        accionesPlan.push({
+          ...baseAccion,
+          pilar: "Seguridad",
+          causa:
+            procedimiento.observaciones?.trim() ||
+            "Desviación detectada en el procedimiento de trabajo",
+          que: procedimiento.tipoAccion?.trim() || null,
+          quien: procedimiento.responsable?.trim() || null,
+          estado:
+            procedimiento.tipoAccion?.trim() &&
+            procedimiento.responsable?.trim()
+              ? "Pendiente"
+              : "Sin planificar",
+        });
+      }
+    }
+
+    // CALIDAD: condición del producto
+    (moduleResults.calidad?.producto?.hallazgos || []).forEach(
+      (hallazgo) => {
+        accionesPlan.push({
+          ...baseAccion,
+          pilar: "Calidad",
+          causa: hallazgo.descripcion?.trim() || "Hallazgo de calidad",
+        });
+      }
+    );
+
+    // CALIDAD: controles del proceso
+    (moduleResults.calidad?.controlProceso?.hallazgos || []).forEach(
+      (hallazgo) => {
+        const tipo = hallazgo.tipo?.trim();
+        const descripcion = hallazgo.descripcion?.trim();
+
+        accionesPlan.push({
+          ...baseAccion,
+          pilar: "Calidad",
+          causa:
+            [tipo, descripcion].filter(Boolean).join(" — ") ||
+            "Desviación en control del proceso",
+        });
+      }
+    );
+
+    // PROCESO / PRODUCTIVIDAD
+    (moduleResults.proceso?.hallazgos || []).forEach((hallazgo) => {
+      const tipo = hallazgo.tipo?.trim();
+      const descripcion = hallazgo.descripcion?.trim();
+
+      accionesPlan.push({
+        ...baseAccion,
+        pilar: "Proceso / Productividad",
+        causa:
+          [tipo, descripcion].filter(Boolean).join(" — ") ||
+          "Oportunidad de mejora del proceso",
+      });
+    });
+
+    if (accionesPlan.length > 0) {
+      const { error: planError } = await supabase
+        .from("plan_accion")
+        .insert(accionesPlan);
+
+      if (planError) {
+        console.error(
+          "El Gemba se guardó, pero hubo un error al crear el Plan de Acción:",
+          planError
+        );
+
+        alert(
+          `El Gemba sí quedó guardado, pero no se pudieron enviar los hallazgos de Seguridad, Calidad y Proceso al Plan de Acción.\n\n${planError.message}\n\nLos datos del Gemba se conservarán en pantalla para que podás revisarlos.`
+        );
+        return;
+      }
     }
 
     const hallazgosMantenimiento =
@@ -512,36 +626,39 @@ function App() {
         );
 
         alert(
-          `El Gemba sí quedó guardado, pero no se pudieron crear automáticamente las tareas de mantenimiento.\n\n${mantenimientoError.message}\n\nLos datos del Gemba se conservarán en pantalla para que podás revisarlos.`
+          `El Gemba sí quedó guardado y sus acciones fueron enviadas al Plan de Acción, pero no se pudieron crear automáticamente las tareas de mantenimiento.\n\n${mantenimientoError.message}\n\nLos datos del Gemba se conservarán en pantalla para que podás revisarlos.`
         );
-
         return;
       }
     }
 
-    const mensajeFinal =
-      hallazgosMantenimiento.length > 0
-        ? `Gemba guardado y finalizado correctamente.\n\nSe enviaron ${hallazgosMantenimiento.length} ${
-            hallazgosMantenimiento.length === 1
-              ? "tarea"
-              : "tareas"
-          } a Gestión de Mantenimiento.`
-        : "Gemba guardado y finalizado correctamente.";
+    const partesMensaje = [
+      "Gemba guardado y finalizado correctamente.",
+    ];
 
-    alert(mensajeFinal);
+    if (accionesPlan.length > 0) {
+      partesMensaje.push(
+        `Se enviaron ${accionesPlan.length} ${
+          accionesPlan.length === 1 ? "acción" : "acciones"
+        } al Plan de Acción.`
+      );
+    }
+
+    if (hallazgosMantenimiento.length > 0) {
+      partesMensaje.push(
+        `Se enviaron ${hallazgosMantenimiento.length} ${
+          hallazgosMantenimiento.length === 1 ? "tarea" : "tareas"
+        } a Gestión de Mantenimiento.`
+      );
+    }
+
+    alert(partesMensaje.join("\n\n"));
 
     setGembaStarted(false);
-
     setActiveGembaModule(null);
-
     setShowGembaSummary(false);
-
     setGembaData(getEmptyGembaData());
-
-    setModuleResults(
-      getEmptyModuleResults()
-    );
-
+    setModuleResults(getEmptyModuleResults());
     setCurrentPage("dashboard");
 
     window.scrollTo({
