@@ -26,7 +26,6 @@ function Proceso({
     tipo: "",
     descripcion: "",
     impacto: "Medio",
-    perdidaEstimada: "",
   });
 
   const desperdiciosLean = [
@@ -65,8 +64,7 @@ function Proceso({
       tipo: "",
       descripcion: "",
       impacto: "Medio",
-      perdidaEstimada: "",
-    });
+      });
   }
 
   function eliminarHallazgo(id) {
@@ -321,29 +319,6 @@ function Proceso({
                 />
               </label>
 
-              <label
-                className="form-field"
-                style={{ marginTop: "16px" }}
-              >
-                <span>
-                  Estimación de pérdida (opcional)
-                </span>
-
-                <input
-                  type="text"
-                  value={
-                    nuevoHallazgo.perdidaEstimada
-                  }
-                  onChange={(event) =>
-                    setNuevoHallazgo((previous) => ({
-                      ...previous,
-                      perdidaEstimada:
-                        event.target.value,
-                    }))
-                  }
-                />
-              </label>
-
               <div className="finding-entry-actions">
                 <button
                   type="button"
@@ -403,16 +378,6 @@ function Proceso({
                               }
                             </p>
 
-                            {hallazgo.perdidaEstimada && (
-                              <p>
-                                <strong>
-                                  Pérdida estimada:
-                                </strong>{" "}
-                                {
-                                  hallazgo.perdidaEstimada
-                                }
-                              </p>
-                            )}
                           </div>
 
                           <button
