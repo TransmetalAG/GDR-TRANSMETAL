@@ -5,9 +5,10 @@ import {
   Trash2,
   X,
   CheckCircle2,
+  Wrench,
+  ArrowRight,
 } from "lucide-react";
 
-import { catalogo } from "../data/CatalogoMaquinas.js";
 import { colaboradores } from "../data/CatalogoColaboradores.js";
 import { supabase } from "../lib/supabase.js";
 
@@ -52,7 +53,6 @@ function normalizarAccion(row) {
     id: row.id,
     origen: row.origen || "Manual",
     pilar: row.pilar || "",
-    equipo: row.maquina || "",
     causa: row.hallazgo || "",
     que: row.que || "",
     como: row.como || "",
@@ -72,7 +72,6 @@ function PlanAccion() {
 
   const [filtrosEncabezado, setFiltrosEncabezado] = useState({
     pilar: "",
-    equipo: "",
     quien: "",
     cuando: "",
     estado: "",
@@ -83,10 +82,12 @@ function PlanAccion() {
 
   const [mostrandoNuevaFila, setMostrandoNuevaFila] = useState(false);
   const [guardandoNueva, setGuardandoNueva] = useState(false);
+  const [accionParaMantenimiento, setAccionParaMantenimiento] = useState(null);
+  const [prioridadMantenimiento, setPrioridadMantenimiento] = useState("Media");
+  const [enviandoMantenimiento, setEnviandoMantenimiento] = useState(false);
 
   const [nuevaFila, setNuevaFila] = useState({
     pilar: "",
-    equipo: "",
     causa: "",
     que: "",
     como: "",
@@ -105,26 +106,11 @@ function PlanAccion() {
     );
   }, [acciones]);
 
-  const maquinas = useMemo(() => {
-    return [
-      ...new Set(
-        catalogo.map((item) => item.maquina)
-      ),
-    ].sort((a, b) =>
-      a.localeCompare(b, "es")
-    );
-  }, []);
-
-
   const accionesVisibles = useMemo(() => {
     return acciones.filter((accion) => {
       const coincidePilar =
         !filtrosEncabezado.pilar ||
         accion.pilar === filtrosEncabezado.pilar;
-
-      const coincideEquipo =
-        !filtrosEncabezado.equipo ||
-        accion.equipo === filtrosEncabezado.equipo;
 
       const coincideQuien =
         !filtrosEncabezado.quien ||
@@ -148,7 +134,6 @@ function PlanAccion() {
 
       return (
         coincidePilar &&
-        coincideEquipo &&
         coincideQuien &&
         coincideCuando &&
         coincideEstado
@@ -222,7 +207,6 @@ function PlanAccion() {
   async function guardarCelda(accion, campo, valor) {
     const mapaCampos = {
       pilar: "pilar",
-      equipo: "maquina",
       causa: "hallazgo",
       que: "que",
       como: "como",
@@ -327,6 +311,59 @@ function PlanAccion() {
     }
   }
 
+  function abrirEnvioMantenimiento(accion) {
+    if (!accion.equipo) return alert("Esta acción no tiene un equipo seleccionado.");
+    if (!accion.causa?.trim()) return alert("Esta acción no tiene una causa para enviar.");
+    setAccionParaMantenimiento(accion);
+    setPrioridadMantenimiento("Media");
+  }
+
+  async function enviarAMantenimiento() {
+    if (!accionParaMantenimiento) return;
+    setEnviandoMantenimiento(true);
+    const referencia = `Plan de Acción ID: ${accionParaMantenimiento.id}`;
+
+    const { data: duplicados, error: errorBusqueda } = await supabase
+      .from("mantenimiento")
+      .select("id")
+      .eq("tipo_registro", "tarea")
+      .eq("origen", "Plan de Acción")
+      .ilike("observaciones", `%${referencia}%`)
+      .limit(1);
+
+    if (errorBusqueda) {
+      alert(`No se pudo verificar el envío.\n\n${errorBusqueda.message}`);
+      setEnviandoMantenimiento(false);
+      return;
+    }
+    if (duplicados?.length) {
+      alert("Esta acción ya fue enviada a Gestión de Mantenimiento.");
+      setEnviandoMantenimiento(false);
+      setAccionParaMantenimiento(null);
+      return;
+    }
+
+    const { error } = await supabase.from("mantenimiento").insert({
+      tipo_registro: "tarea",
+      equipo: accionParaMantenimiento.equipo,
+      tarea: accionParaMantenimiento.causa.trim(),
+      responsable: null,
+      dia_programado: null,
+      tiempo_estimado_horas: null,
+      prioridad: prioridadMantenimiento,
+      estado: "Pendiente de asignación",
+      origen: "Plan de Acción",
+      gemba_id: null,
+      observaciones: `Generada desde Plan de Acción. ${referencia}`,
+      fecha_cierre: null,
+    });
+
+    setEnviandoMantenimiento(false);
+    if (error) return alert(`No se pudo enviar a Mantenimiento.\n\n${error.message}`);
+    alert("Acción enviada correctamente a Gestión de Mantenimiento.");
+    setAccionParaMantenimiento(null);
+  }
+
   async function eliminarAccion(accion) {
     const confirmar = window.confirm(
       `¿Seguro que deseás eliminar esta acción?\n\n${accion.causa}\n\nEsta acción no se puede deshacer.`
@@ -353,7 +390,6 @@ function PlanAccion() {
   function abrirNuevaFila() {
     setNuevaFila({
       pilar: "",
-      equipo: "",
       causa: "",
       que: "",
       como: "",
@@ -370,7 +406,6 @@ function PlanAccion() {
 
     setNuevaFila({
       pilar: "",
-      equipo: "",
       causa: "",
       que: "",
       como: "",
@@ -405,7 +440,6 @@ function PlanAccion() {
       .insert({
         origen: "Manual",
         pilar: nuevaFila.pilar,
-        maquina: nuevaFila.equipo || null,
         hallazgo: nuevaFila.causa.trim(),
         que: nuevaFila.que.trim() || null,
         como: nuevaFila.como.trim() || null,
@@ -510,7 +544,7 @@ function PlanAccion() {
             <table
               style={{
                 width: "100%",
-                minWidth: "1500px",
+                minWidth: "1320px",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
                 background: "#fff",
@@ -553,50 +587,6 @@ function PlanAccion() {
                         {PILARES.map((pilar) => (
                           <option key={pilar} value={pilar}>
                             {pilar}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </th>
-
-                  <th
-                    style={{
-                      width: "180px",
-                      padding: "8px",
-                      textAlign: "left",
-                      fontSize: "12px",
-                      fontWeight: 800,
-                      color: "#344054",
-                      background: "#f8fafc",
-                      border: "1px solid #e5e7eb",
-                      position: "sticky",
-                      top: 0,
-                      zIndex: 3,
-                    }}
-                  >
-                    <div style={{ display: "grid", gap: "6px" }}>
-                      <span>Equipo</span>
-                      <select
-                        value={filtrosEncabezado.equipo}
-                        onChange={(event) =>
-                          setFiltrosEncabezado((previous) => ({
-                            ...previous,
-                            equipo: event.target.value,
-                          }))
-                        }
-                        style={{
-                          width: "100%",
-                          minHeight: "30px",
-                          fontSize: "11px",
-                        }}
-                      >
-                        <option value="">Todos</option>
-                        {maquinas.map((maquina) => (
-                          <option
-                            key={maquina}
-                            value={maquina}
-                          >
-                            {maquina}
                           </option>
                         ))}
                       </select>
@@ -834,38 +824,6 @@ function PlanAccion() {
                     </td>
 
                     <td style={cellBase}>
-                      <select
-                        value={nuevaFila.equipo}
-                        onChange={(event) =>
-                          cambiarNuevaFila(
-                            "equipo",
-                            event.target.value
-                          )
-                        }
-                        style={{
-                          width: "100%",
-                          minHeight: "38px",
-                          border: "1px solid #2563eb",
-                          borderRadius: "6px",
-                          padding: "6px",
-                        }}
-                      >
-                        <option value="">
-                          Seleccionar
-                        </option>
-
-                        {maquinas.map((maquina) => (
-                          <option
-                            key={maquina}
-                            value={maquina}
-                          >
-                            {maquina}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-
-                    <td style={cellBase}>
                       <textarea
                         value={nuevaFila.causa}
                         onChange={(event) =>
@@ -1073,7 +1031,6 @@ function PlanAccion() {
                     >
                       {[
                         "pilar",
-                        "equipo",
                         "causa",
                         "que",
                         "como",
@@ -1147,43 +1104,6 @@ function PlanAccion() {
                                       value={pilar}
                                     >
                                       {pilar}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : campo === "equipo" ? (
-                                <select
-                                  autoFocus
-                                  value={valorEdicion}
-                                  onChange={(event) =>
-                                    setValorEdicion(
-                                      event.target.value
-                                    )
-                                  }
-                                  onBlur={() =>
-                                    guardarCelda(
-                                      accion,
-                                      campo,
-                                      valorEdicion
-                                    )
-                                  }
-                                  style={{
-                                    width: "100%",
-                                    minHeight: "38px",
-                                    border:
-                                      "1px solid #2563eb",
-                                    borderRadius: "6px",
-                                  }}
-                                >
-                                  <option value="">
-                                    Seleccionar
-                                  </option>
-
-                                  {maquinas.map((maquina) => (
-                                    <option
-                                      key={maquina}
-                                      value={maquina}
-                                    >
-                                      {maquina}
                                     </option>
                                   ))}
                                 </select>
@@ -1397,16 +1317,29 @@ function PlanAccion() {
                           textAlign: "center",
                         }}
                       >
-                        <button
-                          type="button"
-                          className="icon-delete-button"
-                          onClick={() =>
-                            eliminarAccion(accion)
-                          }
-                          title="Eliminar acción"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div style={{ display: "flex", justifyContent: "center", gap: "6px" }}>
+                          <button
+                            type="button"
+                            onClick={() => abrirEnvioMantenimiento(accion)}
+                            title="Enviar a Mantenimiento"
+                            style={{
+                              width: "38px", height: "38px", border: "1px solid #dbe3ee",
+                              borderRadius: "10px", background: "#eef3f8", color: "#344054",
+                              display: "inline-flex", alignItems: "center", justifyContent: "center",
+                              gap: "1px", cursor: "pointer"
+                            }}
+                          >
+                            <Wrench size={15} /><ArrowRight size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-delete-button"
+                            onClick={() => eliminarAccion(accion)}
+                            title="Eliminar acción"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1416,8 +1349,57 @@ function PlanAccion() {
           </div>
         )}
       </section>
+
+      {accionParaMantenimiento && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 1000, background: "rgba(15,23,42,.38)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: "20px"
+        }}>
+          <div style={{
+            width: "100%", maxWidth: "460px", background: "#fff",
+            borderRadius: "18px", padding: "22px",
+            boxShadow: "0 24px 70px rgba(15,23,42,.20)"
+          }}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:"16px"}}>
+              <div>
+                <h3 style={{margin:0}}>Enviar a Gestión de Mantenimiento</h3>
+                <p style={{color:"#667085",fontSize:"13px"}}>
+                  Se creará como Pendiente de asignación.
+                </p>
+              </div>
+              <button type="button" onClick={()=>setAccionParaMantenimiento(null)}
+                style={{border:0,background:"transparent",cursor:"pointer"}}><X size={20}/></button>
+            </div>
+
+            <p><strong>Equipo:</strong> {accionParaMantenimiento.equipo}</p>
+            <p><strong>Descripción:</strong> {accionParaMantenimiento.causa}</p>
+
+            <label style={{display:"block",marginBottom:"20px"}}>
+              <strong style={{display:"block",marginBottom:"6px"}}>Prioridad</strong>
+              <select value={prioridadMantenimiento}
+                onChange={e=>setPrioridadMantenimiento(e.target.value)}
+                style={{width:"100%",minHeight:"42px",border:"1px solid #d0d5dd",
+                  borderRadius:"8px",padding:"0 10px",background:"#fff"}}>
+                <option value="Baja">Baja</option>
+                <option value="Media">Media</option>
+                <option value="Alta">Alta</option>
+                <option value="Crítica">Crítica</option>
+              </select>
+            </label>
+
+            <div style={{display:"flex",justifyContent:"flex-end",gap:"10px"}}>
+              <button type="button" className="secondary-button"
+                onClick={()=>setAccionParaMantenimiento(null)}
+                disabled={enviandoMantenimiento}>Cancelar</button>
+              <button type="button" className="primary-button"
+                onClick={enviarAMantenimiento} disabled={enviandoMantenimiento}>
+                <Wrench size={17}/>
+                {enviandoMantenimiento ? "Enviando..." : "Enviar a Mantenimiento"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
-
-export default PlanAccion;
