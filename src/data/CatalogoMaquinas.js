@@ -42,6 +42,8 @@ export const catalogo = [
   { maquina: "Línea de Lámina: Mezcla de MP", proceso: "Mezcla de materias primas" },
   { maquina: "Línea de Lámina: Horno", proceso: "Horno" },
   { maquina: "Línea de Lámina: Medida y Corte", proceso: "Medida y Corte" },
+  { maquina: "Ensamble de rueda", proceso: "Ensamble de rueda" },
+  { maquina: "Ensamble de carreta", proceso: "Ensamble de carreta" },
   { maquina: "Mantenimiento", proceso: "Mantenimiento" },
     
 ];
