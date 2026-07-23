@@ -487,7 +487,8 @@ function App() {
         hallazgosMantenimiento.map((hallazgo) => ({
           tipo_registro: "tarea",
           equipo: gembaData.maquina,
-          tarea: hallazgo.descripcion,
+          hallazgo: hallazgo.descripcion,
+          tarea: "",
           responsable: null,
           dia_programado: null,
           tiempo_estimado_horas: null,
