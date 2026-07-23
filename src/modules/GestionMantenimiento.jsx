@@ -116,6 +116,8 @@ function GestionMantenimiento() {
     prioridad: "",
     equipo: "",
     busqueda: "",
+    fechaInicio: "",
+    fechaFin: "",
   });
 
   const [nuevaTarea, setNuevaTarea] = useState({
@@ -253,35 +255,63 @@ function GestionMantenimiento() {
         tarea.tarea.toLowerCase().includes(textoBusqueda) ||
         tarea.equipo.toLowerCase().includes(textoBusqueda);
 
+      const coincideFechaInicio =
+        !filtros.fechaInicio ||
+        (tarea.diaProgramado &&
+          tarea.diaProgramado >= filtros.fechaInicio);
+
+      const coincideFechaFin =
+        !filtros.fechaFin ||
+        (tarea.diaProgramado &&
+          tarea.diaProgramado <= filtros.fechaFin);
+
       return (
         coincideResponsable &&
         coincideEstado &&
         coincidePrioridad &&
         coincideEquipo &&
-        coincideBusqueda
+        coincideBusqueda &&
+        coincideFechaInicio &&
+        coincideFechaFin
       );
     });
   }, [tareas, filtros]);
 
   const indicadores = useMemo(() => {
+    const base = tareasFiltradas;
+
+    const pendientes = base.filter(
+      (tarea) => tarea.estado === "Pendiente de asignación"
+    ).length;
+
+    const asignadas = base.filter(
+      (tarea) => tarea.estado === "Asignada"
+    ).length;
+
+    const enProceso = base.filter(
+      (tarea) => tarea.estado === "En proceso"
+    ).length;
+
+    const terminadas = base.filter(
+      (tarea) => tarea.estado === "Terminada"
+    ).length;
+
+    const total = base.length;
+
+    const porcentajeCierre =
+      total > 0
+        ? (terminadas / total) * 100
+        : 0;
+
     return {
-      pendientes: tareas.filter(
-        (tarea) => tarea.estado === "Pendiente de asignación"
-      ).length,
-
-      asignadas: tareas.filter(
-        (tarea) => tarea.estado === "Asignada"
-      ).length,
-
-      enProceso: tareas.filter(
-        (tarea) => tarea.estado === "En proceso"
-      ).length,
-
-      terminadas: tareas.filter(
-        (tarea) => tarea.estado === "Terminada"
-      ).length,
+      pendientes,
+      asignadas,
+      enProceso,
+      terminadas,
+      total,
+      porcentajeCierre,
     };
-  }, [tareas]);
+  }, [tareasFiltradas]);
 
   function handleNuevaTareaChange(event) {
     const { name, value } = event.target;
@@ -803,61 +833,56 @@ function GestionMantenimiento() {
         </small>
       </section>
 
-      <section className="kpi-grid">
-        <div className="kpi-card">
+      <section
+        className="section-block"
+        style={{
+          marginBottom: "12px",
+          padding: "10px 14px",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "18px",
+            flexWrap: "wrap",
+            fontSize: "12px",
+          }}
+        >
           <span>
-            Pendientes
+            <strong>{indicadores.total}</strong> tareas
           </span>
 
-          <strong>
-            {indicadores.pendientes}
-          </strong>
-
-          <small>
-            Sin planificación completa
-          </small>
-        </div>
-
-        <div className="kpi-card">
           <span>
-            Asignadas
+            Pendientes: <strong>{indicadores.pendientes}</strong>
           </span>
 
-          <strong>
-            {indicadores.asignadas}
-          </strong>
-
-          <small>
-            Programadas para ejecución
-          </small>
-        </div>
-
-        <div className="kpi-card">
           <span>
-            En proceso
+            Asignadas: <strong>{indicadores.asignadas}</strong>
           </span>
 
-          <strong>
-            {indicadores.enProceso}
-          </strong>
-
-          <small>
-            Trabajos actualmente activos
-          </small>
-        </div>
-
-        <div className="kpi-card">
           <span>
-            Terminadas
+            En proceso: <strong>{indicadores.enProceso}</strong>
           </span>
 
-          <strong>
-            {indicadores.terminadas}
-          </strong>
+          <span>
+            Terminadas: <strong>{indicadores.terminadas}</strong>
+          </span>
 
-          <small>
-            Tareas finalizadas
-          </small>
+          <span
+            style={{
+              marginLeft: "auto",
+              fontWeight: 800,
+              color:
+                indicadores.porcentajeCierre >= 80
+                  ? "#15803d"
+                  : indicadores.porcentajeCierre >= 50
+                    ? "#b45309"
+                    : "#b91c1c",
+            }}
+          >
+            Cierre: {indicadores.porcentajeCierre.toFixed(1)}%
+          </span>
         </div>
       </section>
 
@@ -1098,161 +1123,267 @@ function GestionMantenimiento() {
         </section>
       )}
 
-      <section className="section-block">
-        <div className="section-heading">
+      <section className="section-block" style={{ padding: "14px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "end",
+            justifyContent: "space-between",
+            gap: "12px",
+            flexWrap: "wrap",
+            marginBottom: "12px",
+          }}
+        >
           <div>
-            <span className="eyebrow">
-              Planificación
-            </span>
-
-            <h3>
+            <span className="eyebrow">Planificación</span>
+            <h3 style={{ margin: "2px 0 0" }}>
               Tareas de mantenimiento
             </h3>
           </div>
 
-          <p>
-            Filtrá por responsable, estado, prioridad o equipo.
-          </p>
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              flexWrap: "wrap",
+              alignItems: "end",
+            }}
+          >
+            <label style={{ display: "grid", gap: "4px" }}>
+              <span style={{ fontSize: "10px", fontWeight: 700 }}>
+                Inicio
+              </span>
+              <input
+                type="date"
+                name="fechaInicio"
+                value={filtros.fechaInicio}
+                onChange={handleFiltroChange}
+                style={{
+                  minHeight: "34px",
+                  padding: "5px 8px",
+                  border: "1px solid #d0d5dd",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                }}
+              />
+            </label>
+
+            <label style={{ display: "grid", gap: "4px" }}>
+              <span style={{ fontSize: "10px", fontWeight: 700 }}>
+                Fin
+              </span>
+              <input
+                type="date"
+                name="fechaFin"
+                value={filtros.fechaFin}
+                onChange={handleFiltroChange}
+                style={{
+                  minHeight: "34px",
+                  padding: "5px 8px",
+                  border: "1px solid #d0d5dd",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                }}
+              />
+            </label>
+
+            <label style={{ display: "grid", gap: "4px" }}>
+              <span style={{ fontSize: "10px", fontWeight: 700 }}>
+                Responsable
+              </span>
+              <select
+                name="responsable"
+                value={filtros.responsable}
+                onChange={handleFiltroChange}
+                style={{
+                  minHeight: "34px",
+                  minWidth: "150px",
+                  padding: "5px 8px",
+                  border: "1px solid #d0d5dd",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  background: "#fff",
+                }}
+              >
+                <option value="">Todos</option>
+                {TECNICOS.map((tecnico) => (
+                  <option key={tecnico} value={tecnico}>
+                    {tecnico}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: "grid", gap: "4px" }}>
+              <span style={{ fontSize: "10px", fontWeight: 700 }}>
+                Estado
+              </span>
+              <select
+                name="estado"
+                value={filtros.estado}
+                onChange={handleFiltroChange}
+                style={{
+                  minHeight: "34px",
+                  minWidth: "140px",
+                  padding: "5px 8px",
+                  border: "1px solid #d0d5dd",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  background: "#fff",
+                }}
+              >
+                <option value="">Todos</option>
+                <option value="Pendiente de asignación">
+                  Pendiente
+                </option>
+                <option value="Asignada">Asignada</option>
+                <option value="En proceso">En proceso</option>
+                <option value="Terminada">Terminada</option>
+              </select>
+            </label>
+
+            <label style={{ display: "grid", gap: "4px" }}>
+              <span style={{ fontSize: "10px", fontWeight: 700 }}>
+                Prioridad
+              </span>
+              <select
+                name="prioridad"
+                value={filtros.prioridad}
+                onChange={handleFiltroChange}
+                style={{
+                  minHeight: "34px",
+                  minWidth: "110px",
+                  padding: "5px 8px",
+                  border: "1px solid #d0d5dd",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  background: "#fff",
+                }}
+              >
+                <option value="">Todas</option>
+                <option value="Baja">Baja</option>
+                <option value="Media">Media</option>
+                <option value="Alta">Alta</option>
+                <option value="Crítica">Crítica</option>
+              </select>
+            </label>
+
+            <label style={{ display: "grid", gap: "4px" }}>
+              <span style={{ fontSize: "10px", fontWeight: 700 }}>
+                Equipo
+              </span>
+              <select
+                name="equipo"
+                value={filtros.equipo}
+                onChange={handleFiltroChange}
+                style={{
+                  minHeight: "34px",
+                  minWidth: "140px",
+                  maxWidth: "180px",
+                  padding: "5px 8px",
+                  border: "1px solid #d0d5dd",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  background: "#fff",
+                }}
+              >
+                <option value="">Todos</option>
+                {maquinas.map((maquina) => (
+                  <option key={maquina} value={maquina}>
+                    {maquina}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: "grid", gap: "4px" }}>
+              <span style={{ fontSize: "10px", fontWeight: 700 }}>
+                Buscar
+              </span>
+              <input
+                type="text"
+                name="busqueda"
+                value={filtros.busqueda}
+                onChange={handleFiltroChange}
+                placeholder="Equipo o tarea"
+                style={{
+                  minHeight: "34px",
+                  width: "160px",
+                  padding: "5px 8px",
+                  border: "1px solid #d0d5dd",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                }}
+              />
+            </label>
+          </div>
         </div>
 
         <div
-          className="form-grid"
           style={{
-            marginBottom: "22px",
+            display: "flex",
+            gap: "6px",
+            marginBottom: "10px",
+            flexWrap: "wrap",
           }}
         >
-          <label className="form-field">
-            <span>
-              <Search size={17} />
-              Buscar
-            </span>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => {
+              const inicio = getMonday(new Date());
+              setFiltros((previous) => ({
+                ...previous,
+                fechaInicio: inicio,
+                fechaFin: addDays(inicio, 6),
+              }));
+            }}
+            style={{ padding: "6px 10px", fontSize: "11px" }}
+          >
+            Esta semana
+          </button>
 
-            <input
-              type="text"
-              name="busqueda"
-              value={filtros.busqueda}
-              onChange={handleFiltroChange}
-              placeholder="Buscar equipo o tarea"
-            />
-          </label>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => {
+              const hoy = new Date();
+              const inicio = toDateString(
+                new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+              );
+              const fin = toDateString(
+                new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0)
+              );
 
-          <label className="form-field">
-            <span>
-              <User size={17} />
-              Responsable
-            </span>
+              setFiltros((previous) => ({
+                ...previous,
+                fechaInicio: inicio,
+                fechaFin: fin,
+              }));
+            }}
+            style={{ padding: "6px 10px", fontSize: "11px" }}
+          >
+            Este mes
+          </button>
 
-            <select
-              name="responsable"
-              value={filtros.responsable}
-              onChange={handleFiltroChange}
-            >
-              <option value="">
-                Todos
-              </option>
-
-              {TECNICOS.map((tecnico) => (
-                <option
-                  key={tecnico}
-                  value={tecnico}
-                >
-                  {tecnico}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>
-              <Filter size={17} />
-              Estado
-            </span>
-
-            <select
-              name="estado"
-              value={filtros.estado}
-              onChange={handleFiltroChange}
-            >
-              <option value="">
-                Todos
-              </option>
-
-              <option value="Pendiente de asignación">
-                Pendiente de asignación
-              </option>
-
-              <option value="Asignada">
-                Asignada
-              </option>
-
-              <option value="En proceso">
-                En proceso
-              </option>
-
-              <option value="Terminada">
-                Terminada
-              </option>
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>
-              <AlertTriangle size={17} />
-              Prioridad
-            </span>
-
-            <select
-              name="prioridad"
-              value={filtros.prioridad}
-              onChange={handleFiltroChange}
-            >
-              <option value="">
-                Todas
-              </option>
-
-              <option value="Baja">
-                Baja
-              </option>
-
-              <option value="Media">
-                Media
-              </option>
-
-              <option value="Alta">
-                Alta
-              </option>
-
-              <option value="Crítica">
-                Crítica
-              </option>
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>
-              <Factory size={17} />
-              Equipo
-            </span>
-
-            <select
-              name="equipo"
-              value={filtros.equipo}
-              onChange={handleFiltroChange}
-            >
-              <option value="">
-                Todos
-              </option>
-
-              {maquinas.map((maquina) => (
-                <option
-                  key={maquina}
-                  value={maquina}
-                >
-                  {maquina}
-                </option>
-              ))}
-            </select>
-          </label>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() =>
+              setFiltros({
+                responsable: "",
+                estado: "",
+                prioridad: "",
+                equipo: "",
+                busqueda: "",
+                fechaInicio: "",
+                fechaFin: "",
+              })
+            }
+            style={{ padding: "6px 10px", fontSize: "11px" }}
+          >
+            Limpiar
+          </button>
         </div>
 
         {loading ? (
