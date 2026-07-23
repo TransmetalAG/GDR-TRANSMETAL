@@ -29,6 +29,7 @@ import Calidad from "./modules/Calidad.jsx";
 import Proceso from "./modules/Proceso.jsx";
 import Mantenimiento from "./modules/Mantenimiento.jsx";
 import GestionMantenimiento from "./modules/GestionMantenimiento.jsx";
+import EquipoMantenimiento from "./modules/EquipoMantenimiento.jsx";
 import PlanAccion from "./modules/PlanAccion.jsx";
 
 import ResumenGemba from "./components/ResumenGemba.jsx";
@@ -50,7 +51,7 @@ function App() {
       const parsedUser = savedUser ? JSON.parse(savedUser) : null;
 
       return parsedUser?.rol === "Mantenimiento"
-        ? "mantenimiento"
+        ? "equipo-mantenimiento"
         : "dashboard";
     } catch {
       return "dashboard";
@@ -122,8 +123,8 @@ function App() {
     currentUser?.rol === "Mantenimiento"
       ? [
           {
-            id: "mantenimiento",
-            label: "Mantenimiento",
+            id: "equipo-mantenimiento",
+            label: "Equipo Mantenimiento",
             icon: Wrench,
           },
         ]
@@ -145,8 +146,13 @@ function App() {
           },
           {
             id: "mantenimiento",
-            label: "Mantenimiento",
+            label: "Gestión Mantenimiento",
             icon: Wrench,
+          },
+          {
+            id: "equipo-mantenimiento",
+            label: "Equipo Mantenimiento",
+            icon: Hammer,
           },
           {
             id: "mis-tareas",
@@ -230,7 +236,7 @@ function App() {
 
     setCurrentPage(
       user.rol === "Mantenimiento"
-        ? "mantenimiento"
+        ? "equipo-mantenimiento"
         : "dashboard"
     );
   }
@@ -311,7 +317,7 @@ function App() {
 
   function handleNewGemba() {
     if (currentUser?.rol === "Mantenimiento") {
-      setCurrentPage("mantenimiento");
+      setCurrentPage("equipo-mantenimiento");
       return;
     }
 
@@ -820,6 +826,11 @@ function App() {
         {currentPage ===
           "mantenimiento" && (
           <GestionMantenimiento />
+        )}
+
+        {currentPage ===
+          "equipo-mantenimiento" && (
+          <EquipoMantenimiento />
         )}
 
         {currentPage ===
