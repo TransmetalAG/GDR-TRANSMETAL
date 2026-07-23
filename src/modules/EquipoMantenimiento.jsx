@@ -28,6 +28,34 @@ function formatDate(dateString) {
   }).format(new Date(`${dateString}T12:00:00`));
 }
 
+function toDateString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getMonday(dateValue = new Date()) {
+  const date =
+    typeof dateValue === "string"
+      ? new Date(`${dateValue}T12:00:00`)
+      : new Date(dateValue);
+
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+
+  date.setDate(date.getDate() + diff);
+  date.setHours(12, 0, 0, 0);
+
+  return toDateString(date);
+}
+
+function addDays(dateString, days) {
+  const date = new Date(`${dateString}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return toDateString(date);
+}
+
 function normalizarTarea(row) {
   return {
     id: row.id,
@@ -51,6 +79,9 @@ function EquipoMantenimiento() {
   const [loading, setLoading] = useState(true);
   const [actualizandoId, setActualizandoId] = useState(null);
   const [tecnicoSeleccionado, setTecnicoSeleccionado] = useState("");
+  const [semanaSeleccionada, setSemanaSeleccionada] = useState(
+    getMonday(new Date())
+  );
   const [tareas, setTareas] = useState([]);
 
   useEffect(() => {
@@ -64,7 +95,7 @@ function EquipoMantenimiento() {
       .from("mantenimiento")
       .select("*")
       .eq("tipo_registro", "tarea")
-      .in("estado", ["Asignada", "En proceso", "Terminada"])
+      .in("estado", ["Asignada", "En proceso", "Terminada", "Cerrada"])
       .order("dia_programado", { ascending: true })
       .order("created_at", { ascending: true });
 
@@ -86,22 +117,52 @@ function EquipoMantenimiento() {
   const tareasVisibles = useMemo(() => {
     if (!tecnicoSeleccionado) return [];
 
-    return tareas.filter(
-      (tarea) => tarea.responsable === tecnicoSeleccionado
-    );
-  }, [tareas, tecnicoSeleccionado]);
+    const finSemana = addDays(semanaSeleccionada, 6);
+
+    return tareas.filter((tarea) => {
+      const coincideTecnico =
+        tarea.responsable === tecnicoSeleccionado;
+
+      const coincideSemana =
+        tarea.diaProgramado &&
+        tarea.diaProgramado >= semanaSeleccionada &&
+        tarea.diaProgramado <= finSemana;
+
+      return coincideTecnico && coincideSemana;
+    });
+  }, [tareas, tecnicoSeleccionado, semanaSeleccionada]);
 
   const resumen = useMemo(() => {
+    const asignadas = tareasVisibles.filter(
+      (tarea) => tarea.estado === "Asignada"
+    ).length;
+
+    const enProceso = tareasVisibles.filter(
+      (tarea) => tarea.estado === "En proceso"
+    ).length;
+
+    const terminadas = tareasVisibles.filter(
+      (tarea) => tarea.estado === "Terminada"
+    ).length;
+
+    const cerradas = tareasVisibles.filter(
+      (tarea) => tarea.estado === "Cerrada"
+    ).length;
+
+    const total = tareasVisibles.length;
+
+    const porcentajeCierre =
+      total > 0
+        ? (cerradas / total) * 100
+        : 0;
+
     return {
-      asignadas: tareasVisibles.filter(
-        (tarea) => tarea.estado === "Asignada"
-      ).length,
-      enProceso: tareasVisibles.filter(
-        (tarea) => tarea.estado === "En proceso"
-      ).length,
-      terminadas: tareasVisibles.filter(
-        (tarea) => tarea.estado === "Terminada"
-      ).length,
+      asignadas,
+      enProceso,
+      terminadas,
+      cerradas,
+      total,
+      porcentajeCierre,
     };
   }, [tareasVisibles]);
 
@@ -181,6 +242,13 @@ function EquipoMantenimiento() {
   }
 
   function getColorEstado(estado) {
+    if (estado === "Cerrada") {
+      return {
+        background: "#dcfce7",
+        color: "#15803d",
+      };
+    }
+
     if (estado === "Terminada") {
       return {
         background: "#f3e8ff",
@@ -237,38 +305,71 @@ function EquipoMantenimiento() {
           marginBottom: "14px",
         }}
       >
-        <label
-          className="form-field"
+        <div
           style={{
-            maxWidth: "340px",
-            margin: 0,
+            display: "flex",
+            gap: "12px",
+            alignItems: "end",
+            flexWrap: "wrap",
           }}
         >
-          <span>
-            <User size={17} />
-            Técnico
-          </span>
-
-          <select
-            value={tecnicoSeleccionado}
-            onChange={(event) =>
-              setTecnicoSeleccionado(event.target.value)
-            }
+          <label
+            className="form-field"
+            style={{
+              flex: "1 1 280px",
+              maxWidth: "360px",
+              margin: 0,
+            }}
           >
-            <option value="">
-              Seleccioná tu nombre
-            </option>
+            <span>
+              <User size={17} />
+              Técnico
+            </span>
 
-            {TECNICOS.map((tecnico) => (
-              <option
-                key={tecnico}
-                value={tecnico}
-              >
-                {tecnico}
+            <select
+              value={tecnicoSeleccionado}
+              onChange={(event) =>
+                setTecnicoSeleccionado(event.target.value)
+              }
+            >
+              <option value="">
+                Seleccioná tu nombre
               </option>
-            ))}
-          </select>
-        </label>
+
+              {TECNICOS.map((tecnico) => (
+                <option
+                  key={tecnico}
+                  value={tecnico}
+                >
+                  {tecnico}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label
+            className="form-field"
+            style={{
+              flex: "0 1 220px",
+              margin: 0,
+            }}
+          >
+            <span>
+              <CalendarDays size={17} />
+              Semana
+            </span>
+
+            <input
+              type="date"
+              value={semanaSeleccionada}
+              onChange={(event) =>
+                setSemanaSeleccionada(
+                  getMonday(event.target.value)
+                )
+              }
+            />
+          </label>
+        </div>
       </section>
 
       {tecnicoSeleccionado && (
@@ -300,13 +401,23 @@ function EquipoMantenimiento() {
               Por verificar: <strong>{resumen.terminadas}</strong>
             </span>
 
+            <span>
+              Cerradas: <strong>{resumen.cerradas}</strong>
+            </span>
+
             <span
               style={{
                 marginLeft: "auto",
-                color: "#667085",
+                fontWeight: 800,
+                color:
+                  resumen.porcentajeCierre >= 80
+                    ? "#15803d"
+                    : resumen.porcentajeCierre >= 50
+                      ? "#b45309"
+                      : "#b91c1c",
               }}
             >
-              {tareasVisibles.length} tareas visibles
+              Cierre: {resumen.porcentajeCierre.toFixed(1)}%
             </span>
           </div>
         </section>
@@ -589,6 +700,28 @@ function EquipoMantenimiento() {
                           />
 
                           Pendiente de verificación
+                        </div>
+                      )}
+
+                      {tarea.estado === "Cerrada" && (
+                        <div
+                          style={{
+                            display: "grid",
+                            gap: "5px",
+                            textAlign: "right",
+                            color: "#15803d",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                          }}
+                        >
+                          <CheckCircle2
+                            size={19}
+                            style={{
+                              marginLeft: "auto",
+                            }}
+                          />
+
+                          Cerrada por líder
                         </div>
                       )}
                     </div>
