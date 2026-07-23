@@ -15,6 +15,11 @@ export const usuarios = [
     rol: "Auditor",
   },
   {
+    nombre: "Alejandro Fonseca",
+    password: "Gerencia2026",
+    rol: "Administrador",
+  },
+  {
     nombre: "Mantenimiento",
     password: "MantenimientoTransmetal",
     rol: "Mantenimiento",
