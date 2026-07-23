@@ -442,9 +442,11 @@ function GestionMantenimiento() {
       dia_programado: nuevaTarea.diaProgramado,
       tiempo_estimado_horas: horas,
       prioridad: nuevaTarea.prioridad,
-      estado: modoEdicion
-        ? nuevaTarea.estado
-        : nuevaTarea.estado === "Pendiente de asignación"
+      estado:
+        nuevaTarea.responsable &&
+        nuevaTarea.diaProgramado &&
+        horas > 0 &&
+        nuevaTarea.estado === "Pendiente de asignación"
           ? "Asignada"
           : nuevaTarea.estado,
       origen: modoEdicion
@@ -634,178 +636,171 @@ function GestionMantenimiento() {
 
       <section
         className="section-block"
-        style={{ marginBottom: "22px" }}
+        style={{ marginBottom: "16px", padding: "14px 16px" }}
       >
-        <div className="section-heading">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "end",
+            justifyContent: "space-between",
+            gap: "16px",
+            flexWrap: "wrap",
+            marginBottom: "10px",
+          }}
+        >
           <div>
-            <span className="eyebrow">
-              Capacidad semanal
-            </span>
-
-            <h3>
+            <span className="eyebrow">Capacidad semanal</span>
+            <h3 style={{ margin: "2px 0 0", fontSize: "16px" }}>
               Programación por técnico
             </h3>
-
-            <p
-              style={{
-                margin: "8px 0 0",
-                color: "#667085",
-                fontSize: "12px",
-              }}
-            >
-              La capacidad es solo una referencia temporal para controlar
-              el límite del 80%; no se guarda en Supabase.
-            </p>
           </div>
 
           <label
             className="form-field"
-            style={{ minWidth: "220px" }}
+            style={{ minWidth: "170px", margin: 0 }}
           >
-            <span>
-              <CalendarDays size={17} />
+            <span style={{ fontSize: "11px" }}>
+              <CalendarDays size={14} />
               Semana
             </span>
-
             <input
               type="date"
               value={semanaSeleccionada}
               onChange={(event) =>
                 setSemanaSeleccionada(getMonday(event.target.value))
               }
+              style={{ minHeight: "34px", padding: "6px 8px" }}
             />
           </label>
         </div>
 
-        <div className="kpi-grid">
-          {resumenCapacidad.map((item) => {
-            const valorEditable =
-              capacidadSemanal[item.tecnico] ?? CAPACIDAD_DEFAULT;
+        <div style={{ overflowX: "auto" }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              minWidth: "760px",
+              fontSize: "12px",
+            }}
+          >
+            <thead>
+              <tr style={{ color: "#667085", textAlign: "left" }}>
+                <th style={{ padding: "6px 8px" }}>Técnico</th>
+                <th style={{ padding: "6px 8px" }}>Capacidad</th>
+                <th style={{ padding: "6px 8px" }}>Programado</th>
+                <th style={{ padding: "6px 8px" }}>Máx. 80%</th>
+                <th style={{ padding: "6px 8px" }}>Disponible</th>
+                <th style={{ padding: "6px 8px" }}>Reserva 20%</th>
+                <th style={{ padding: "6px 8px", minWidth: "130px" }}>Uso</th>
+              </tr>
+            </thead>
+            <tbody>
+              {resumenCapacidad.map((item) => {
+                const valorEditable =
+                  capacidadSemanal[item.tecnico] ?? CAPACIDAD_DEFAULT;
 
-            return (
-              <article
-                className="kpi-card"
-                key={item.tecnico}
-              >
-                <span>
-                  {item.tecnico}
-                </span>
-
-                <div
-                  style={{
-                    marginTop: "12px",
-                  }}
-                >
-                  <label className="form-field">
-                    <span>
-                      Capacidad semanal
-                    </span>
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.5"
-                      value={valorEditable}
-                      onChange={(event) =>
-                        actualizarCapacidadLocal(
-                          item.tecnico,
-                          event.target.value
-                        )
-                      }
-                    />
-
-                    <small
-                      style={{
-                        marginTop: "6px",
-                        color: "#98a2b3",
-                      }}
-                    >
-                      Valor temporal para validar la programación.
-                    </small>
-                  </label>
-                </div>
-
-                <div
-                  style={{
-                    marginTop: "14px",
-                    display: "grid",
-                    gap: "6px",
-                    fontSize: "12px",
-                    color: "#667085",
-                  }}
-                >
-                  <span>
-                    Programado:{" "}
-                    <strong>
+                return (
+                  <tr
+                    key={item.tecnico}
+                    style={{ borderTop: "1px solid #eef2f7" }}
+                  >
+                    <td style={{ padding: "7px 8px", fontWeight: 700 }}>
+                      {item.tecnico}
+                    </td>
+                    <td style={{ padding: "7px 8px" }}>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={valorEditable}
+                        onChange={(event) =>
+                          actualizarCapacidadLocal(
+                            item.tecnico,
+                            event.target.value
+                          )
+                        }
+                        style={{
+                          width: "64px",
+                          minHeight: "30px",
+                          padding: "4px 7px",
+                          border: "1px solid #d0d5dd",
+                          borderRadius: "7px",
+                          font: "inherit",
+                        }}
+                      />{" "}
+                      h
+                    </td>
+                    <td style={{ padding: "7px 8px", fontWeight: 700 }}>
                       {item.horasProgramadas.toFixed(1)} h
-                    </strong>
-                  </span>
-
-                  <span>
-                    Máximo 80%:{" "}
-                    <strong>
+                    </td>
+                    <td style={{ padding: "7px 8px" }}>
                       {item.maximoProgramable.toFixed(1)} h
-                    </strong>
-                  </span>
-
-                  <span>
-                    Disponible para programar:{" "}
-                    <strong>
+                    </td>
+                    <td style={{ padding: "7px 8px" }}>
                       {item.disponibleProgramable.toFixed(1)} h
-                    </strong>
-                  </span>
-
-                  <span>
-                    Reserva correctiva 20%:{" "}
-                    <strong>
+                    </td>
+                    <td style={{ padding: "7px 8px" }}>
                       {item.reservaCorrectiva.toFixed(1)} h
-                    </strong>
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    marginTop: "14px",
-                    height: "8px",
-                    borderRadius: "999px",
-                    background: "#eef2f7",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        item.porcentajeProgramado
-                      )}%`,
-                      height: "100%",
-                      background: item.sobreProgramado
-                        ? "#e11d48"
-                        : "#2563eb",
-                    }}
-                  />
-                </div>
-
-                <small
-                  style={{
-                    marginTop: "8px",
-                    color: item.sobreProgramado
-                      ? "#be123c"
-                      : "#98a2b3",
-                  }}
-                >
-                  {item.sobreProgramado
-                    ? `⚠ ${item.porcentajeProgramado.toFixed(
-                        1
-                      )}% programado`
-                    : `${item.porcentajeProgramado.toFixed(
-                        1
-                      )}% programado`}
-                </small>
-              </article>
-            );
-          })}
+                    </td>
+                    <td style={{ padding: "7px 8px" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "7px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "72px",
+                            height: "6px",
+                            borderRadius: "999px",
+                            background: "#eef2f7",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                item.porcentajeProgramado
+                              )}%`,
+                              height: "100%",
+                              background: item.sobreProgramado
+                                ? "#e11d48"
+                                : "#2563eb",
+                            }}
+                          />
+                        </div>
+                        <span
+                          style={{
+                            color: item.sobreProgramado
+                              ? "#be123c"
+                              : "#667085",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {item.porcentajeProgramado.toFixed(1)}%
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
+
+        <small
+          style={{
+            display: "block",
+            marginTop: "7px",
+            color: "#98a2b3",
+            fontSize: "10px",
+          }}
+        >
+          Capacidad temporal para validar el límite programable del 80%.
+        </small>
       </section>
 
       <section className="kpi-grid">
