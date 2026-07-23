@@ -70,6 +70,7 @@ function normalizarTarea(row) {
   return {
     id: row.id,
     equipo: row.equipo || "",
+    hallazgo: row.hallazgo || "",
     tarea: row.tarea || "",
     responsable: row.responsable || "",
     diaProgramado: row.dia_programado || "",
@@ -123,6 +124,7 @@ function GestionMantenimiento() {
 
   const [nuevaTarea, setNuevaTarea] = useState({
     equipo: "",
+    hallazgo: "",
     tarea: "",
     responsable: "",
     diaProgramado: "",
@@ -254,6 +256,7 @@ function GestionMantenimiento() {
       const coincideBusqueda =
         !textoBusqueda ||
         tarea.tarea.toLowerCase().includes(textoBusqueda) ||
+        tarea.hallazgo.toLowerCase().includes(textoBusqueda) ||
         tarea.equipo.toLowerCase().includes(textoBusqueda);
 
       const coincideFechaInicio =
@@ -340,6 +343,7 @@ function GestionMantenimiento() {
   function limpiarFormulario() {
     setNuevaTarea({
       equipo: "",
+      hallazgo: "",
       tarea: "",
       responsable: "",
       diaProgramado: "",
@@ -362,6 +366,7 @@ function GestionMantenimiento() {
 
     setNuevaTarea({
       equipo: tarea.equipo,
+      hallazgo: tarea.hallazgo || "",
       tarea: tarea.tarea,
       responsable: tarea.responsable,
       diaProgramado: tarea.diaProgramado,
@@ -443,7 +448,7 @@ function GestionMantenimiento() {
     }
 
     if (!nuevaTarea.tarea.trim()) {
-      alert("Describí la tarea de mantenimiento.");
+      alert("Definí el trabajo a realizar antes de asignar la tarea.");
       return;
     }
 
@@ -473,6 +478,7 @@ function GestionMantenimiento() {
     const payload = {
       tipo_registro: "tarea",
       equipo: nuevaTarea.equipo,
+      hallazgo: nuevaTarea.hallazgo.trim() || null,
       tarea: nuevaTarea.tarea.trim(),
       responsable: nuevaTarea.responsable,
       dia_programado: nuevaTarea.diaProgramado,
@@ -1102,8 +1108,23 @@ function GestionMantenimiento() {
 
               <label className="form-field form-field-full">
                 <span>
+                  <AlertTriangle size={17} />
+                  Hallazgo / problema detectado
+                </span>
+
+                <textarea
+                  rows="3"
+                  name="hallazgo"
+                  value={nuevaTarea.hallazgo}
+                  onChange={handleNuevaTareaChange}
+                  placeholder="Problema detectado. Se conserva como contexto del hallazgo original."
+                />
+              </label>
+
+              <label className="form-field form-field-full">
+                <span>
                   <Wrench size={17} />
-                  Tarea de mantenimiento
+                  Trabajo a realizar
                 </span>
 
                 <textarea
@@ -1111,7 +1132,7 @@ function GestionMantenimiento() {
                   name="tarea"
                   value={nuevaTarea.tarea}
                   onChange={handleNuevaTareaChange}
-                  placeholder="Describí claramente la intervención requerida."
+                  placeholder="Definí o profundizá claramente la intervención que deberá ejecutar el técnico."
                 />
               </label>
 
@@ -1342,7 +1363,7 @@ function GestionMantenimiento() {
                 name="busqueda"
                 value={filtros.busqueda}
                 onChange={handleFiltroChange}
-                placeholder="Equipo o tarea"
+                placeholder="Equipo, hallazgo o trabajo"
                 style={{
                   minHeight: "34px",
                   width: "160px",
@@ -1475,7 +1496,13 @@ function GestionMantenimiento() {
                       </p>
 
                       <p>
-                        {tarea.tarea}
+                        <strong>Hallazgo:</strong>{" "}
+                        {tarea.hallazgo || "Sin hallazgo registrado"}
+                      </p>
+
+                      <p>
+                        <strong>Trabajo a realizar:</strong>{" "}
+                        {tarea.tarea || "Pendiente de definir"}
                       </p>
 
                       <p>
