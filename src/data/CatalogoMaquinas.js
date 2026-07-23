@@ -37,10 +37,11 @@ export const catalogo = [
   { maquina: "Formadora de tubo", proceso: "Formado de tubo" },
   { maquina: "Troqueladora de Tubo", proceso: "Perforado de tubo" },
   { maquina: "Cortadora de perfiles Troquet", proceso: "Corte de perfiles" },
-  { maquina: "Soldadora MIG 1", proceso: "Armado" },
-  { maquina: "Soldadora MIG 2", proceso: "Rematado" },
+  { maquina: "Soldadora MIG 1 Armado Troquet", proceso: "Armado" },
+  { maquina: "Soldadora MIG 2 Rematado Troquet", proceso: "Rematado" },
   { maquina: "Línea de Lámina: Mezcla de MP", proceso: "Mezcla de materias primas" },
   { maquina: "Línea de Lámina: Horno", proceso: "Horno" },
   { maquina: "Línea de Lámina: Medida y Corte", proceso: "Medida y Corte" },
-  
+  { maquina: "Mantenimiento", proceso: "Mantenimiento" },
+    
 ];
