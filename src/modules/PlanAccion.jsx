@@ -82,6 +82,7 @@ function PlanAccion() {
 
   const [editandoCelda, setEditandoCelda] = useState(null);
   const [valorEdicion, setValorEdicion] = useState("");
+  const [pilarPersonalizadoEdicion, setPilarPersonalizadoEdicion] = useState("");
 
   const [mostrandoNuevaFila, setMostrandoNuevaFila] = useState(false);
   const [guardandoNueva, setGuardandoNueva] = useState(false);
@@ -92,6 +93,7 @@ function PlanAccion() {
 
   const [nuevaFila, setNuevaFila] = useState({
     pilar: "",
+    pilarPersonalizado: "",
     equipo: "",
     causa: "",
     que: "",
@@ -120,6 +122,18 @@ function PlanAccion() {
       a.localeCompare(b, "es")
     );
   }, []);
+
+  const pilaresFiltro = useMemo(() => {
+    const existentes = acciones
+      .map((accion) => accion.pilar)
+      .filter(Boolean);
+
+    const base = PILARES.filter((pilar) => pilar !== "Otro");
+
+    return [...new Set([...base, ...existentes])].sort((a, b) =>
+      a.localeCompare(b, "es")
+    );
+  }, [acciones]);
 
 
   const accionesVisibles = useMemo(() => {
@@ -217,12 +231,27 @@ function PlanAccion() {
       campo,
     });
 
+    if (campo === "pilar") {
+      const esPilarBase = PILARES.includes(accion.pilar);
+
+      if (esPilarBase) {
+        setValorEdicion(accion.pilar || "");
+        setPilarPersonalizadoEdicion("");
+      } else {
+        setValorEdicion("Otro");
+        setPilarPersonalizadoEdicion(accion.pilar || "");
+      }
+
+      return;
+    }
+
     setValorEdicion(accion[campo] ?? "");
   }
 
   function cancelarEdicion() {
     setEditandoCelda(null);
     setValorEdicion("");
+    setPilarPersonalizadoEdicion("");
   }
 
   async function guardarCelda(accion, campo, valor) {
@@ -320,6 +349,20 @@ function PlanAccion() {
       alert(`No se pudo guardar el cambio.\n\n${error.message}`);
       await cargarAcciones();
     }
+  }
+
+  async function guardarPilarEditado(accion) {
+    const pilarFinal =
+      valorEdicion === "Otro"
+        ? pilarPersonalizadoEdicion.trim()
+        : valorEdicion.trim();
+
+    if (!pilarFinal) {
+      alert("Escribí el nombre del pilar o categoría.");
+      return;
+    }
+
+    await guardarCelda(accion, "pilar", pilarFinal);
   }
 
   function manejarTeclaEdicion(event, accion, campo) {
@@ -445,6 +488,7 @@ function PlanAccion() {
   function abrirNuevaFila() {
     setNuevaFila({
       pilar: "",
+      pilarPersonalizado: "",
       equipo: "",
       causa: "",
       que: "",
@@ -462,6 +506,7 @@ function PlanAccion() {
 
     setNuevaFila({
       pilar: "",
+      pilarPersonalizado: "",
       equipo: "",
       causa: "",
       que: "",
@@ -485,6 +530,16 @@ function PlanAccion() {
       return;
     }
 
+    const pilarFinal =
+      nuevaFila.pilar === "Otro"
+        ? nuevaFila.pilarPersonalizado.trim()
+        : nuevaFila.pilar;
+
+    if (!pilarFinal) {
+      alert("Escribí el nombre del pilar o categoría.");
+      return;
+    }
+
     if (!nuevaFila.causa.trim()) {
       alert("Ingresá la causa.");
       return;
@@ -496,7 +551,7 @@ function PlanAccion() {
       .from("plan_accion")
       .insert({
         origen: "Manual",
-        pilar: nuevaFila.pilar,
+        pilar: pilarFinal,
         maquina: nuevaFila.equipo || null,
         hallazgo: nuevaFila.causa.trim(),
         que: nuevaFila.que.trim() || null,
@@ -642,7 +697,7 @@ function PlanAccion() {
                         }}
                       >
                         <option value="">Todos</option>
-                        {PILARES.map((pilar) => (
+                        {pilaresFiltro.map((pilar) => (
                           <option key={pilar} value={pilar}>
                             {pilar}
                           </option>
@@ -893,36 +948,65 @@ function PlanAccion() {
                     }}
                   >
                     <td style={cellBase}>
-                      <select
-                        autoFocus
-                        value={nuevaFila.pilar}
-                        onChange={(event) =>
-                          cambiarNuevaFila(
-                            "pilar",
-                            event.target.value
-                          )
-                        }
-                        style={{
-                          width: "100%",
-                          minHeight: "38px",
-                          border: "1px solid #2563eb",
-                          borderRadius: "6px",
-                          padding: "6px",
-                        }}
-                      >
-                        <option value="">
-                          Seleccionar
-                        </option>
+                      <div style={{ display: "grid", gap: "6px" }}>
+                        <select
+                          autoFocus
+                          value={nuevaFila.pilar}
+                          onChange={(event) => {
+                            const valor = event.target.value;
 
-                        {PILARES.map((pilar) => (
-                          <option
-                            key={pilar}
-                            value={pilar}
-                          >
-                            {pilar}
+                            setNuevaFila((previous) => ({
+                              ...previous,
+                              pilar: valor,
+                              pilarPersonalizado:
+                                valor === "Otro"
+                                  ? previous.pilarPersonalizado
+                                  : "",
+                            }));
+                          }}
+                          style={{
+                            width: "100%",
+                            minHeight: "38px",
+                            border: "1px solid #2563eb",
+                            borderRadius: "6px",
+                            padding: "6px",
+                          }}
+                        >
+                          <option value="">
+                            Seleccionar
                           </option>
-                        ))}
-                      </select>
+
+                          {PILARES.map((pilar) => (
+                            <option
+                              key={pilar}
+                              value={pilar}
+                            >
+                              {pilar}
+                            </option>
+                          ))}
+                        </select>
+
+                        {nuevaFila.pilar === "Otro" && (
+                          <input
+                            autoFocus
+                            value={nuevaFila.pilarPersonalizado}
+                            onChange={(event) =>
+                              cambiarNuevaFila(
+                                "pilarPersonalizado",
+                                event.target.value
+                              )
+                            }
+                            placeholder="Ej. Hora de Seguridad Conjunta"
+                            style={{
+                              width: "100%",
+                              minHeight: "38px",
+                              border: "1px solid #2563eb",
+                              borderRadius: "6px",
+                              padding: "6px",
+                            }}
+                          />
+                        )}
+                      </div>
                     </td>
 
                     <td style={cellBase}>
@@ -1210,38 +1294,86 @@ function PlanAccion() {
                           >
                             {editando ? (
                               campo === "pilar" ? (
-                                <select
-                                  autoFocus
-                                  value={valorEdicion}
-                                  onChange={(event) =>
-                                    setValorEdicion(
-                                      event.target.value
-                                    )
-                                  }
-                                  onBlur={() =>
-                                    guardarCelda(
-                                      accion,
-                                      campo,
-                                      valorEdicion
-                                    )
-                                  }
+                                <div
                                   style={{
-                                    width: "100%",
-                                    minHeight: "38px",
-                                    border:
-                                      "1px solid #2563eb",
-                                    borderRadius: "6px",
+                                    display: "grid",
+                                    gap: "6px",
                                   }}
+                                  onClick={(event) =>
+                                    event.stopPropagation()
+                                  }
                                 >
-                                  {PILARES.map((pilar) => (
-                                    <option
-                                      key={pilar}
-                                      value={pilar}
-                                    >
-                                      {pilar}
-                                    </option>
-                                  ))}
-                                </select>
+                                  <select
+                                    autoFocus
+                                    value={valorEdicion}
+                                    onChange={(event) => {
+                                      const valor = event.target.value;
+                                      setValorEdicion(valor);
+
+                                      if (valor !== "Otro") {
+                                        setPilarPersonalizadoEdicion("");
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      if (valorEdicion !== "Otro") {
+                                        guardarPilarEditado(accion);
+                                      }
+                                    }}
+                                    style={{
+                                      width: "100%",
+                                      minHeight: "38px",
+                                      border:
+                                        "1px solid #2563eb",
+                                      borderRadius: "6px",
+                                    }}
+                                  >
+                                    {PILARES.map((pilar) => (
+                                      <option
+                                        key={pilar}
+                                        value={pilar}
+                                      >
+                                        {pilar}
+                                      </option>
+                                    ))}
+                                  </select>
+
+                                  {valorEdicion === "Otro" && (
+                                    <input
+                                      autoFocus
+                                      value={pilarPersonalizadoEdicion}
+                                      onChange={(event) =>
+                                        setPilarPersonalizadoEdicion(
+                                          event.target.value
+                                        )
+                                      }
+                                      onKeyDown={(event) => {
+                                        if (
+                                          event.key === "Enter" &&
+                                          !event.shiftKey
+                                        ) {
+                                          event.preventDefault();
+                                          guardarPilarEditado(accion);
+                                        }
+
+                                        if (event.key === "Escape") {
+                                          cancelarEdicion();
+                                        }
+                                      }}
+                                      onBlur={() =>
+                                        guardarPilarEditado(accion)
+                                      }
+                                      placeholder="Ej. Hora de Seguridad Conjunta"
+                                      style={{
+                                        width: "100%",
+                                        minHeight: "38px",
+                                        border:
+                                          "1px solid #2563eb",
+                                        borderRadius: "6px",
+                                        padding: "6px",
+                                      }}
+                                    />
+                                  )}
+                                </div>
                               ) : campo === "equipo" ? (
                                 <select
                                   autoFocus
