@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 
 import { catalogo } from "../data/CatalogoMaquinas.js";
-import { colaboradores } from "../data/CatalogoColaboradores.js";
 import { supabase } from "../lib/supabase.js";
 
 const ESTADOS = [
@@ -54,6 +53,7 @@ function normalizarAccion(row) {
     id: row.id,
     origen: row.origen || "Manual",
     pilar: row.pilar || "",
+    auditor: row.auditor || "",
     equipo: row.maquina || "",
     causa: row.hallazgo || "",
     que: row.que || "",
@@ -69,6 +69,15 @@ function normalizarAccion(row) {
 }
 
 function PlanAccion() {
+  const currentUser = useMemo(() => {
+    try {
+      const savedUser = localStorage.getItem("gdr_user");
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [acciones, setAcciones] = useState([]);
 
@@ -94,6 +103,7 @@ function PlanAccion() {
   const [nuevaFila, setNuevaFila] = useState({
     pilar: "",
     pilarPersonalizado: "",
+    auditor: currentUser?.nombre || "",
     equipo: "",
     causa: "",
     que: "",
@@ -108,7 +118,7 @@ function PlanAccion() {
       .map((accion) => accion.quien)
       .filter(Boolean);
 
-    return [...new Set([...colaboradores, ...existentes])].sort((a, b) =>
+    return [...new Set(existentes)].sort((a, b) =>
       a.localeCompare(b, "es")
     );
   }, [acciones]);
@@ -489,6 +499,7 @@ function PlanAccion() {
     setNuevaFila({
       pilar: "",
       pilarPersonalizado: "",
+      auditor: currentUser?.nombre || "",
       equipo: "",
       causa: "",
       que: "",
@@ -507,6 +518,7 @@ function PlanAccion() {
     setNuevaFila({
       pilar: "",
       pilarPersonalizado: "",
+      auditor: currentUser?.nombre || "",
       equipo: "",
       causa: "",
       que: "",
@@ -552,6 +564,7 @@ function PlanAccion() {
       .insert({
         origen: "Manual",
         pilar: pilarFinal,
+        auditor: nuevaFila.auditor || currentUser?.nombre || null,
         maquina: nuevaFila.equipo || null,
         hallazgo: nuevaFila.causa.trim(),
         que: nuevaFila.que.trim() || null,
@@ -657,7 +670,7 @@ function PlanAccion() {
             <table
               style={{
                 width: "100%",
-                minWidth: "1500px",
+                minWidth: "1660px",
                 borderCollapse: "collapse",
                 tableLayout: "fixed",
                 background: "#fff",
@@ -704,6 +717,24 @@ function PlanAccion() {
                         ))}
                       </select>
                     </div>
+                  </th>
+
+                  <th
+                    style={{
+                      width: "170px",
+                      padding: "12px 10px",
+                      textAlign: "left",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      color: "#344054",
+                      background: "#f8fafc",
+                      border: "1px solid #e5e7eb",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 3,
+                    }}
+                  >
+                    Auditor
                   </th>
 
                   <th
@@ -1010,6 +1041,25 @@ function PlanAccion() {
                     </td>
 
                     <td style={cellBase}>
+                      <input
+                        type="text"
+                        value={nuevaFila.auditor}
+                        readOnly
+                        disabled
+                        style={{
+                          width: "100%",
+                          minHeight: "38px",
+                          border: "1px solid #d0d5dd",
+                          borderRadius: "6px",
+                          padding: "6px",
+                          background: "#f8fafc",
+                          color: "#475467",
+                          fontWeight: 700,
+                        }}
+                      />
+                    </td>
+
+                    <td style={cellBase}>
                       <select
                         value={nuevaFila.equipo}
                         onChange={(event) =>
@@ -1116,7 +1166,6 @@ function PlanAccion() {
                             event.target.value
                           )
                         }
-                        list="responsables-nueva-fila"
                         placeholder="Responsable"
                         style={{
                           width: "100%",
@@ -1127,14 +1176,6 @@ function PlanAccion() {
                         }}
                       />
 
-                      <datalist id="responsables-nueva-fila">
-                        {responsables.map((responsable) => (
-                          <option
-                            key={responsable}
-                            value={responsable}
-                          />
-                        ))}
-                      </datalist>
                     </td>
 
                     <td style={cellBase}>
@@ -1247,6 +1288,17 @@ function PlanAccion() {
                           : "#fff",
                       }}
                     >
+                      <td
+                        style={{
+                          ...cellBase,
+                          color: "#475467",
+                          fontWeight: 700,
+                          background: "#f8fafc",
+                        }}
+                      >
+                        {accion.auditor || "—"}
+                      </td>
+
                       {[
                         "pilar",
                         "equipo",
@@ -1435,7 +1487,6 @@ function PlanAccion() {
                                         valorEdicion
                                       )
                                     }
-                                    list="responsables-inline"
                                     style={{
                                       width: "100%",
                                       minHeight: "38px",
@@ -1446,16 +1497,6 @@ function PlanAccion() {
                                     }}
                                   />
 
-                                  <datalist id="responsables-inline">
-                                    {responsables.map(
-                                      (responsable) => (
-                                        <option
-                                          key={responsable}
-                                          value={responsable}
-                                        />
-                                      )
-                                    )}
-                                  </datalist>
                                 </>
                               ) : esFecha ? (
                                 <input
