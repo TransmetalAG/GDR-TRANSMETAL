@@ -8,7 +8,6 @@ import {
   Plus,
   Trash2,
   Camera,
-  Wrench,
   AlertTriangle,
   CheckCircle2,
 } from "lucide-react";
@@ -50,7 +49,6 @@ function Seguridad({
   const [nuevoHallazgoFisico, setNuevoHallazgoFisico] = useState({
     descripcion: "",
     criticidad: "Media",
-    requiereMantenimiento: false,
   });
 
   const [nuevoHallazgoComportamiento, setNuevoHallazgoComportamiento] =
@@ -79,7 +77,6 @@ function Seguridad({
     setNuevoHallazgoFisico({
       descripcion: "",
       criticidad: "Media",
-      requiereMantenimiento: false,
     });
   }
 
@@ -448,31 +445,6 @@ function Seguridad({
                     </select>
                   </label>
 
-                  <label className="maintenance-check">
-                    <input
-                      type="checkbox"
-                      checked={
-                        nuevoHallazgoFisico.requiereMantenimiento
-                      }
-                      onChange={(event) =>
-                        setNuevoHallazgoFisico((previous) => ({
-                          ...previous,
-                          requiereMantenimiento: event.target.checked,
-                        }))
-                      }
-                    />
-
-                    <div>
-                      <Wrench size={19} />
-
-                      <span>
-                        <strong>Requiere Mantenimiento</strong>
-                        <small>
-                          Enviar este hallazgo al flujo de mantenimiento.
-                        </small>
-                      </span>
-                    </div>
-                  </label>
                 </div>
 
                 <div className="finding-entry-actions">
@@ -536,12 +508,7 @@ function Seguridad({
                             {hallazgo.criticidad}
                           </span>
 
-                          {hallazgo.requiereMantenimiento && (
-                            <span className="maintenance-tag">
-                              <Wrench size={13} />
-                              Mantenimiento
-                            </span>
-                          )}
+
                         </div>
                       </div>
                     </article>
