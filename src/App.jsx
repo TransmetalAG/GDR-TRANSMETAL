@@ -740,10 +740,10 @@ function App() {
           </div>
 
           <div>
-            <h1>GDR Gemba</h1>
+            <h1>GDR</h1>
 
             <span>
-              Gestión de Rutina
+              Gestión de Rutina Transmetal
             </span>
           </div>
         </div>
@@ -1029,8 +1029,8 @@ function LoginPage({ onLogin }) {
             <Footprints size={24} />
           </div>
 
-          <span className="eyebrow">Gestión de Rutina</span>
-          <h2 style={{ margin: 0 }}>GDR Gemba</h2>
+          <span className="eyebrow">GDR</span>
+          <h2 style={{ margin: 0 }}>Gestión de Rutina Transmetal</h2>
           <p
             style={{
               margin: "8px 0 0",
