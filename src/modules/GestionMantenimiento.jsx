@@ -84,6 +84,7 @@ function normalizarTarea(row) {
     gembaId: row.gemba_id || null,
     observaciones: row.observaciones || "",
     createdAt: row.created_at || null,
+    fechaCierre: row.fecha_cierre || null,
   };
 }
 
@@ -292,22 +293,27 @@ function GestionMantenimiento() {
       (tarea) => tarea.estado === "En proceso"
     ).length;
 
-    const terminadas = base.filter(
+    const porVerificar = base.filter(
       (tarea) => tarea.estado === "Terminada"
+    ).length;
+
+    const cerradas = base.filter(
+      (tarea) => tarea.estado === "Cerrada"
     ).length;
 
     const total = base.length;
 
     const porcentajeCierre =
       total > 0
-        ? (terminadas / total) * 100
+        ? (cerradas / total) * 100
         : 0;
 
     return {
       pendientes,
       asignadas,
       enProceso,
-      terminadas,
+      porVerificar,
+      cerradas,
       total,
       porcentajeCierre,
     };
@@ -534,9 +540,8 @@ function GestionMantenimiento() {
       estado: nuevoEstado,
     };
 
-    // Si se marca como terminada, registramos fecha/hora de cierre.
-    // Si se vuelve a abrir, limpiamos la fecha de cierre.
-    if (nuevoEstado === "Terminada") {
+    // Solo una tarea verificada por liderazgo queda formalmente cerrada.
+    if (nuevoEstado === "Cerrada") {
       payload.fecha_cierre = new Date().toISOString();
     } else {
       payload.fecha_cierre = null;
@@ -566,12 +571,36 @@ function GestionMantenimiento() {
     }
   }
 
+  async function verificarYCerrar(tarea) {
+    const confirmar = window.confirm(
+      `¿Confirmás que el trabajo fue verificado y quedó correctamente resuelto?\n\n${tarea.equipo} — ${tarea.tarea}`
+    );
+    if (!confirmar) return;
+    await cambiarEstadoDirecto(tarea.id, "Cerrada");
+  }
+
+  async function reabrirTarea(tarea) {
+    const confirmar = window.confirm(
+      `¿Deseás reabrir esta tarea porque el problema no quedó resuelto?\n\n${tarea.equipo} — ${tarea.tarea}`
+    );
+    if (!confirmar) return;
+    await cambiarEstadoDirecto(tarea.id, "Asignada");
+  }
+
   function getEstiloEstado(estado) {
-    if (estado === "Terminada") {
+    if (estado === "Cerrada") {
       return {
         background: "#dcfce7",
         color: "#15803d",
         border: "1px solid #bbf7d0",
+      };
+    }
+
+    if (estado === "Terminada") {
+      return {
+        background: "#f3e8ff",
+        color: "#7e22ce",
+        border: "1px solid #e9d5ff",
       };
     }
 
@@ -866,7 +895,11 @@ function GestionMantenimiento() {
           </span>
 
           <span>
-            Terminadas: <strong>{indicadores.terminadas}</strong>
+            Por verificar: <strong>{indicadores.porVerificar}</strong>
+          </span>
+
+          <span>
+            Cerradas: <strong>{indicadores.cerradas}</strong>
           </span>
 
           <span
@@ -1061,6 +1094,9 @@ function GestionMantenimiento() {
                   <option value="Terminada">
                     Terminada
                   </option>
+                  <option value="Cerrada">
+                    Cerrada
+                  </option>
                 </select>
               </label>
 
@@ -1238,7 +1274,8 @@ function GestionMantenimiento() {
                 </option>
                 <option value="Asignada">Asignada</option>
                 <option value="En proceso">En proceso</option>
-                <option value="Terminada">Terminada</option>
+                <option value="Terminada">Por verificar</option>
+                <option value="Cerrada">Cerrada</option>
               </select>
             </label>
 
@@ -1485,6 +1522,29 @@ function GestionMantenimiento() {
                           : "Editar"}
                       </button>
 
+                      {tarea.estado === "Terminada" && (
+                        <>
+                          <button
+                            type="button"
+                            className="primary-button"
+                            onClick={() => verificarYCerrar(tarea)}
+                            title="Verificar el trabajo y cerrar la tarea"
+                          >
+                            <CheckCircle2 size={16} />
+                            Verificar y cerrar
+                          </button>
+
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => reabrirTarea(tarea)}
+                            title="Reabrir porque el problema no quedó resuelto"
+                          >
+                            Reabrir
+                          </button>
+                        </>
+                      )}
+
                       <button
                         type="button"
                         className="icon-delete-button"
@@ -1594,6 +1654,7 @@ function GestionMantenimiento() {
                             "Asignada",
                             "En proceso",
                             "Terminada",
+                            "Cerrada",
                           ].map((estado) => {
                             const seleccionado = tarea.estado === estado;
 
@@ -1617,7 +1678,7 @@ function GestionMantenimiento() {
                                   width: "100%",
                                   border: 0,
                                   borderBottom:
-                                    estado !== "Terminada"
+                                    estado !== "Cerrada"
                                       ? "1px solid #eef2f7"
                                       : "none",
                                   padding: "10px 12px",
@@ -1634,7 +1695,9 @@ function GestionMantenimiento() {
                                   justifyContent: "center",
                                 }}
                               >
-                                {estado}
+                                {estado === "Terminada"
+                                  ? "Por verificar"
+                                  : estado}
                               </button>
                             );
                           })}
