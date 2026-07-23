@@ -475,6 +475,7 @@ function App() {
     const baseAccion = {
       origen: "Gemba",
       pilar: null,
+      auditor: gembaData.auditor,
       maquina: gembaData.maquina,
       colaborador: gembaData.collaborator || null,
       hallazgo: null,
