@@ -344,6 +344,13 @@ function PlanAccion() {
       return;
     }
 
+    if (!accion.que?.trim()) {
+      alert(
+        "Definí primero el Qué de la acción. Ese texto será el trabajo a realizar en Mantenimiento."
+      );
+      return;
+    }
+
     setAccionParaMantenimiento(accion);
     setPrioridadMantenimiento("Media");
   }
@@ -384,7 +391,8 @@ function PlanAccion() {
       .insert({
         tipo_registro: "tarea",
         equipo: accionParaMantenimiento.equipo,
-        tarea: accionParaMantenimiento.causa.trim(),
+        hallazgo: accionParaMantenimiento.causa.trim(),
+        tarea: accionParaMantenimiento.que.trim(),
         responsable: null,
         dia_programado: null,
         tiempo_estimado_horas: null,
@@ -1551,7 +1559,7 @@ function PlanAccion() {
           <div
             style={{
               width: "100%",
-              maxWidth: "460px",
+              maxWidth: "520px",
               background: "#fff",
               borderRadius: "18px",
               padding: "22px",
@@ -1603,8 +1611,13 @@ function PlanAccion() {
               </div>
 
               <div>
-                <strong>Descripción</strong>
+                <strong>Causa / Hallazgo</strong>
                 <div>{accionParaMantenimiento.causa}</div>
+              </div>
+
+              <div>
+                <strong>Qué / Trabajo a realizar</strong>
+                <div>{accionParaMantenimiento.que}</div>
               </div>
 
               <label>
