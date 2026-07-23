@@ -1288,19 +1288,9 @@ function PlanAccion() {
                           : "#fff",
                       }}
                     >
-                      <td
-                        style={{
-                          ...cellBase,
-                          color: "#475467",
-                          fontWeight: 700,
-                          background: "#f8fafc",
-                        }}
-                      >
-                        {accion.auditor || "—"}
-                      </td>
-
                       {[
                         "pilar",
+                        "auditor",
                         "equipo",
                         "causa",
                         "que",
@@ -1319,7 +1309,7 @@ function PlanAccion() {
                           <td
                             key={campo}
                             onClick={() => {
-                              if (!editando) {
+                              if (campo !== "auditor" && !editando) {
                                 iniciarEdicion(
                                   accion,
                                   campo
@@ -1331,16 +1321,27 @@ function PlanAccion() {
                               padding: editando
                                 ? "4px"
                                 : "10px",
-                              cursor: "text",
+                              cursor:
+                                campo === "auditor"
+                                  ? "default"
+                                  : "text",
+                              background:
+                                campo === "auditor"
+                                  ? "#f8fafc"
+                                  : "#fff",
                               color:
                                 campo === "cuando" &&
                                 atrasada
                                   ? "#b91c1c"
+                                  : campo === "auditor"
+                                  ? "#475467"
                                   : "#101828",
                               fontWeight:
                                 campo === "cuando" &&
                                 atrasada
                                   ? 800
+                                  : campo === "auditor"
+                                  ? 700
                                   : 500,
                             }}
                           >
