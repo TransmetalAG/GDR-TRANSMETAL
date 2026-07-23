@@ -476,76 +476,92 @@ function App() {
     }
 
     const accionesPlan = [];
+
     const baseAccion = {
-      equipo: gembaData.maquina,
+      origen: "Gemba",
+      pilar: null,
+      maquina: gembaData.maquina,
+      colaborador: gembaData.collaborator || null,
+      hallazgo: null,
+      prioridad: "Media",
       que: null,
       como: null,
-      quien: null,
-      cuando: null,
+      responsable: null,
+      fecha_compromiso: null,
       estado: "Sin planificar",
-      origen: "Gemba",
+      fecha_cierre: null,
       gemba_id: gembaGuardado.id,
     };
 
-    // SEGURIDAD: condiciones físicas
+    // SEGURIDAD · Condiciones físicas
     (moduleResults.seguridad?.condiciones?.hallazgos || []).forEach(
       (hallazgo) => {
         accionesPlan.push({
           ...baseAccion,
           pilar: "Seguridad",
-          causa: hallazgo.descripcion?.trim() || "Hallazgo de seguridad",
+          hallazgo:
+            hallazgo.descripcion?.trim() ||
+            "Hallazgo de condiciones físicas",
+          prioridad: hallazgo.criticidad || "Media",
         });
       }
     );
 
-    // SEGURIDAD: comportamientos
+    // SEGURIDAD · Comportamiento
     (moduleResults.seguridad?.comportamiento?.hallazgos || []).forEach(
       (hallazgo) => {
         accionesPlan.push({
           ...baseAccion,
           pilar: "Seguridad",
-          causa: hallazgo.descripcion?.trim() || "Hallazgo de comportamiento",
+          hallazgo:
+            hallazgo.descripcion?.trim() ||
+            "Hallazgo de comportamiento",
+          prioridad: hallazgo.criticidad || "Media",
         });
       }
     );
 
-    // SEGURIDAD: desviación de procedimiento
+    // SEGURIDAD · Procedimientos
     const procedimiento = moduleResults.seguridad?.procedimientos;
-    if (procedimiento?.existeProcedimiento === "si") {
-      const hayDesviacion =
-        procedimiento?.cumpleProcedimiento === "no" ||
-        procedimiento?.hayDesviacion === "si";
 
-      if (hayDesviacion) {
+    if (procedimiento) {
+      const requiereAccionProcedimiento =
+        procedimiento.existeProcedimiento === "no" ||
+        procedimiento.estaActualizado === "no" ||
+        procedimiento.reflejaRealidad === "no" ||
+        procedimiento.conoceYAplica === "parcialmente" ||
+        procedimiento.conoceYAplica === "no";
+
+      if (requiereAccionProcedimiento) {
         accionesPlan.push({
           ...baseAccion,
           pilar: "Seguridad",
-          causa:
+          hallazgo:
             procedimiento.observaciones?.trim() ||
             "Desviación detectada en el procedimiento de trabajo",
           que: procedimiento.tipoAccion?.trim() || null,
-          quien: procedimiento.responsable?.trim() || null,
-          estado:
-            procedimiento.tipoAccion?.trim() &&
-            procedimiento.responsable?.trim()
-              ? "Pendiente"
-              : "Sin planificar",
+          responsable:
+            procedimiento.responsable?.trim() || null,
+          estado: "Sin planificar",
         });
       }
     }
 
-    // CALIDAD: condición del producto
+    // CALIDAD · Condición del producto
     (moduleResults.calidad?.producto?.hallazgos || []).forEach(
       (hallazgo) => {
         accionesPlan.push({
           ...baseAccion,
           pilar: "Calidad",
-          causa: hallazgo.descripcion?.trim() || "Hallazgo de calidad",
+          hallazgo:
+            hallazgo.descripcion?.trim() ||
+            "Hallazgo de calidad",
+          prioridad: hallazgo.criticidad || "Media",
         });
       }
     );
 
-    // CALIDAD: controles del proceso
+    // CALIDAD · Control del proceso
     (moduleResults.calidad?.controlProceso?.hallazgos || []).forEach(
       (hallazgo) => {
         const tipo = hallazgo.tipo?.trim();
@@ -554,9 +570,10 @@ function App() {
         accionesPlan.push({
           ...baseAccion,
           pilar: "Calidad",
-          causa:
+          hallazgo:
             [tipo, descripcion].filter(Boolean).join(" — ") ||
             "Desviación en control del proceso",
+          prioridad: hallazgo.criticidad || "Media",
         });
       }
     );
@@ -569,9 +586,15 @@ function App() {
       accionesPlan.push({
         ...baseAccion,
         pilar: "Proceso / Productividad",
-        causa:
+        hallazgo:
           [tipo, descripcion].filter(Boolean).join(" — ") ||
           "Oportunidad de mejora del proceso",
+        prioridad:
+          hallazgo.impacto === "Alto"
+            ? "Alta"
+            : hallazgo.impacto === "Bajo"
+              ? "Baja"
+              : "Media",
       });
     });
 
@@ -593,6 +616,7 @@ function App() {
       }
     }
 
+    // MANTENIMIENTO -> Gestión de Mantenimiento
     const hallazgosMantenimiento =
       moduleResults.mantenimiento?.hallazgos || [];
 
