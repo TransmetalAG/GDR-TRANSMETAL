@@ -1288,7 +1288,29 @@ textarea {
   }
 
   .sidebar-user {
-    display: none;
+    display: flex;
+    margin-top: 12px;
+    padding: 12px 8px calc(2px + env(safe-area-inset-bottom));
+    border-top: 1px solid #273244;
+  }
+
+  .sidebar-user > div:nth-child(2) {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .sidebar-user strong,
+  .sidebar-user span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sidebar-user button {
+    flex-shrink: 0;
+    width: 36px !important;
+    height: 36px;
+    padding: 0 !important;
   }
 
   .main-content {
