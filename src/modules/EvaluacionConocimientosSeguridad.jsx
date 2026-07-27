@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ShieldCheck,
   User,
-  Factory,
   CalendarDays,
   Play,
   Save,
@@ -118,7 +117,6 @@ export default function EvaluacionConocimientosSeguridad({
 
   const [datosGenerales, setDatosGenerales] = useState({
     colaborador: "",
-    area: "",
     observaciones: "",
   });
 
@@ -195,7 +193,7 @@ export default function EvaluacionConocimientosSeguridad({
     const { data, error } = await supabase
       .from("evaluaciones_conocimiento")
       .select(
-        "id, colaborador, area, auditor, fecha, puntaje_obtenido, puntaje_maximo, porcentaje, aprobado"
+        "id, colaborador, auditor, fecha, puntaje_obtenido, puntaje_maximo, porcentaje, aprobado"
       )
       .order("fecha", { ascending: false })
       .limit(25);
@@ -278,11 +276,11 @@ export default function EvaluacionConocimientosSeguridad({
   function iniciarEvaluacion(event) {
     event.preventDefault();
 
-    if (!datosGenerales.colaborador || !datosGenerales.area.trim()) {
+    if (!datosGenerales.colaborador) {
       setMensaje({
         tipo: "error",
         texto:
-          "Seleccioná al colaborador e ingresá el área antes de iniciar la evaluación.",
+          "Seleccioná al colaborador antes de iniciar la evaluación.",
       });
       return;
     }
@@ -316,7 +314,6 @@ export default function EvaluacionConocimientosSeguridad({
 
     setDatosGenerales({
       colaborador: "",
-      area: "",
       observaciones: "",
     });
     setRespuestas(crearRespuestasVacias());
@@ -332,10 +329,6 @@ export default function EvaluacionConocimientosSeguridad({
   function validarEvaluacion() {
     if (!datosGenerales.colaborador) {
       return "Seleccioná al colaborador evaluado.";
-    }
-
-    if (!datosGenerales.area.trim()) {
-      return "Ingresá el área del colaborador.";
     }
 
     if (!usuario?.nombre) {
@@ -384,7 +377,6 @@ export default function EvaluacionConocimientosSeguridad({
         .from("evaluaciones_conocimiento")
         .insert({
           colaborador: datosGenerales.colaborador,
-          area: datosGenerales.area.trim(),
           auditor: usuario.nombre,
           fecha: fechaIso,
           observaciones:
@@ -469,7 +461,6 @@ export default function EvaluacionConocimientosSeguridad({
 
     setDatosGenerales({
       colaborador: "",
-      area: "",
       observaciones: "",
     });
     setRespuestas(crearRespuestasVacias());
@@ -542,8 +533,8 @@ export default function EvaluacionConocimientosSeguridad({
                 </span>
                 <h3>Nueva evaluación</h3>
                 <p>
-                  Seleccioná al colaborador y registrá su área antes
-                  de iniciar las preguntas.
+                  Seleccioná al colaborador antes de iniciar las
+                  preguntas.
                 </p>
               </div>
 
@@ -554,7 +545,7 @@ export default function EvaluacionConocimientosSeguridad({
             </div>
 
             <div className="form-grid">
-              <label className="form-field">
+              <label className="form-field form-field-full">
                 <span>
                   <User size={17} />
                   Colaborador
@@ -578,21 +569,6 @@ export default function EvaluacionConocimientosSeguridad({
                     </option>
                   ))}
                 </select>
-              </label>
-
-              <label className="form-field">
-                <span>
-                  <Factory size={17} />
-                  Área
-                </span>
-
-                <input
-                  type="text"
-                  name="area"
-                  value={datosGenerales.area}
-                  onChange={actualizarDatoGeneral}
-                  placeholder="Ejemplo: Pintura, Tolvas, Trefilación..."
-                />
               </label>
 
               <label className="form-field form-field-full">
@@ -690,11 +666,6 @@ export default function EvaluacionConocimientosSeguridad({
             <div className="context-item">
               <span>Colaborador</span>
               <strong>{datosGenerales.colaborador}</strong>
-            </div>
-
-            <div className="context-item">
-              <span>Área</span>
-              <strong>{datosGenerales.area}</strong>
             </div>
 
             <div className="context-item">
@@ -1155,7 +1126,6 @@ export default function EvaluacionConocimientosSeguridad({
                   {[
                     "Fecha",
                     "Colaborador",
-                    "Área",
                     "Auditor",
                     "Puntaje",
                     "Porcentaje",
@@ -1203,15 +1173,6 @@ export default function EvaluacionConocimientosSeguridad({
                       }}
                     >
                       {evaluacion.colaborador}
-                    </td>
-
-                    <td
-                      style={{
-                        padding: "14px",
-                        borderBottom: "1px solid #eaecf0",
-                      }}
-                    >
-                      {evaluacion.area}
                     </td>
 
                     <td
