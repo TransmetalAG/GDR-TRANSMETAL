@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ShieldCheck,
   User,
   CalendarDays,
   Play,
@@ -11,7 +10,6 @@ import {
   ClipboardCheck,
   Loader2,
   History,
-  Award,
 } from "lucide-react";
 
 import { supabase } from "../lib/supabase.js";
@@ -521,7 +519,7 @@ export default function EvaluacionConocimientosSeguridad({
       )}
 
       {!evaluacionIniciada && (
-        <section className="gemba-form-layout">
+        <section>
           <form
             className="gemba-form-card"
             onSubmit={iniciarEvaluacion}
@@ -538,10 +536,6 @@ export default function EvaluacionConocimientosSeguridad({
                 </p>
               </div>
 
-              <div className="date-badge">
-                <CalendarDays size={18} />
-                <span>{fechaVisible}</span>
-              </div>
             </div>
 
             <div className="form-grid">
@@ -587,6 +581,20 @@ export default function EvaluacionConocimientosSeguridad({
 
               <label className="form-field form-field-full">
                 <span>
+                  <CalendarDays size={17} />
+                  Fecha
+                </span>
+
+                <input
+                  type="text"
+                  value={fechaVisible}
+                  readOnly
+                  disabled
+                />
+              </label>
+
+              <label className="form-field form-field-full">
+                <span>
                   <ClipboardCheck size={17} />
                   Observaciones generales
                 </span>
@@ -622,41 +630,7 @@ export default function EvaluacionConocimientosSeguridad({
             </div>
           </form>
 
-          <aside className="gemba-help-card">
-            <div className="help-icon">
-              <ShieldCheck size={26} />
-            </div>
 
-            <h3>Criterio de aprobación</h3>
-
-            <p>
-              La evaluación tiene un máximo de{" "}
-              <strong>{PUNTAJE_MAXIMO} puntos</strong>.
-            </p>
-
-            <div className="help-list">
-              <div>
-                <CheckCircle2 size={18} />
-                <span>
-                  <strong>23 a 28 puntos:</strong> aprobado.
-                </span>
-              </div>
-
-              <div>
-                <XCircle size={18} />
-                <span>
-                  <strong>0 a 22 puntos:</strong> no aprobado.
-                </span>
-              </div>
-
-              <div>
-                <Award size={18} />
-                <span>
-                  Se requiere alcanzar al menos el 80 %.
-                </span>
-              </div>
-            </div>
-          </aside>
         </section>
       )}
 
