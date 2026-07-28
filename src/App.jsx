@@ -32,6 +32,7 @@ import EquipoMantenimiento from "./modules/EquipoMantenimiento.jsx";
 import PlanAccion from "./modules/PlanAccion.jsx";
 import Dashboard from "./modules/Dashboard.jsx";
 import EvaluacionConocimientosSeguridad from "./modules/EvaluacionConocimientosSeguridad.jsx";
+import EvaluacionConocimientos from "./modules/EvaluacionConocimientos.jsx";
 
 import ResumenGemba from "./components/ResumenGemba.jsx";
 import { supabase } from "./lib/supabase.js";
@@ -146,7 +147,7 @@ function App() {
             icon: ClipboardList,
           },
           {
-            id: "evaluacion-conocimientos-seguridad",
+            id: "evaluacion-conocimientos",
             label: "Evaluación de Conocimientos",
             icon: ShieldCheck,
           },
@@ -967,11 +968,22 @@ function App() {
           <PlanAccion />
         )}
 
+        {currentPage === "evaluacion-conocimientos" && (
+          <EvaluacionConocimientos
+            onSeleccionarModulo={(modulo) => {
+              if (modulo === "seguridad") {
+                setCurrentPage("evaluacion-conocimientos-seguridad");
+              }
+            }}
+          />
+        )}
+
         {currentPage ===
           "evaluacion-conocimientos-seguridad" && (
           <EvaluacionConocimientosSeguridad
             currentUser={currentUser}
             colaboradores={colaboradoresOrdenados}
+            onBack={() => setCurrentPage("evaluacion-conocimientos")}
           />
         )}
 
