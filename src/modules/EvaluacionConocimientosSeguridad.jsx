@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  ArrowLeft,
   User,
   CalendarDays,
   Play,
@@ -118,6 +119,7 @@ function obtenerUsuarioActual(currentUser) {
 export default function EvaluacionConocimientosSeguridad({
   currentUser,
   colaboradores = [],
+  onBack,
 }) {
   const usuario = obtenerUsuarioActual(currentUser);
 
@@ -795,6 +797,17 @@ export default function EvaluacionConocimientosSeguridad({
             los colaboradores y registrá automáticamente el resultado.
           </p>
         </div>
+
+        {onBack && (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onBack}
+          >
+            <ArrowLeft size={18} />
+            Regresar
+          </button>
+        )}
       </header>
 
       {mensaje && (
