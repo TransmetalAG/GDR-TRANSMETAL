@@ -11,10 +11,16 @@ import {
   Loader2,
   History,
   FileSpreadsheet,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  SlidersHorizontal,
+  Award,
 } from "lucide-react";
 
-import { supabase } from "../lib/supabase.js";
 import * as XLSX from "xlsx";
+
+import { supabase } from "../lib/supabase.js";
 
 const PREGUNTAS = [
   {
@@ -133,6 +139,14 @@ export default function EvaluacionConocimientosSeguridad({
   const [exportandoExcel, setExportandoExcel] = useState(false);
   const [historial, setHistorial] = useState([]);
   const [mensaje, setMensaje] = useState(null);
+  const [historialVisible, setHistorialVisible] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [periodo, setPeriodo] = useState("todos");
+  const [resultadoFiltro, setResultadoFiltro] = useState("todos");
+  const [reconocimientoFiltro, setReconocimientoFiltro] = useState("todos");
+  const [orden, setOrden] = useState("fecha_desc");
+  const [agrupacion, setAgrupacion] = useState("mes");
+  const [gruposAbiertos, setGruposAbiertos] = useState({});
 
   const colaboradoresOrdenados = useMemo(
     () =>
@@ -191,31 +205,6 @@ export default function EvaluacionConocimientosSeguridad({
   async function cargarHistorial() {
     setCargandoHistorial(true);
 
-    const { data, error } = await supabase
-      .from("evaluaciones_conocimiento")
-      .select(
-        "id, colaborador, auditor, fecha, puntaje_obtenido, puntaje_maximo, porcentaje, aprobado"
-      )
-      .order("fecha", { ascending: false })
-      .limit(25);
-
-    if (error) {
-      console.error(
-        "Error al cargar el historial de evaluaciones:",
-        error
-      );
-      setHistorial([]);
-    } else {
-      setHistorial(data || []);
-    }
-
-    setCargandoHistorial(false);
-  }
-
-  async function exportarAExcel() {
-    setExportandoExcel(true);
-    setMensaje(null);
-
     try {
       const evaluaciones = [];
       const tamanoLote = 1000;
@@ -239,88 +228,266 @@ export default function EvaluacionConocimientosSeguridad({
         desde += tamanoLote;
       }
 
+      setHistorial(evaluaciones);
+    } catch (error) {
+      console.error("Error al cargar el historial de evaluaciones:", error);
+      setHistorial([]);
+      setMensaje({
+        tipo: "error",
+        texto: `No se pudo cargar el historial. ${
+          error?.message || "Intentá nuevamente."
+        }`,
+      });
+    } finally {
+      setCargandoHistorial(false);
+    }
+  }
+
+  function obtenerInicioSemana(fecha) {
+    const copia = new Date(fecha);
+    const dia = copia.getDay();
+    const diferencia = dia === 0 ? -6 : 1 - dia;
+    copia.setDate(copia.getDate() + diferencia);
+    copia.setHours(0, 0, 0, 0);
+    return copia;
+  }
+
+  function cumplePeriodo(fechaEvaluacion) {
+    if (periodo === "todos") return true;
+
+    const fecha = new Date(fechaEvaluacion);
+    const ahora = new Date();
+
+    if (Number.isNaN(fecha.getTime())) return false;
+
+    if (periodo === "semana") {
+      const inicioSemana = obtenerInicioSemana(ahora);
+      return fecha >= inicioSemana;
+    }
+
+    if (periodo === "mes") {
+      return (
+        fecha.getFullYear() === ahora.getFullYear() &&
+        fecha.getMonth() === ahora.getMonth()
+      );
+    }
+
+    if (periodo === "anio") {
+      return fecha.getFullYear() === ahora.getFullYear();
+    }
+
+    return true;
+  }
+
+  const historialFiltrado = useMemo(() => {
+    const termino = busqueda.trim().toLocaleLowerCase("es");
+
+    const filtrado = historial.filter((evaluacion) => {
+      const coincideBusqueda =
+        !termino ||
+        String(evaluacion.colaborador || "")
+          .toLocaleLowerCase("es")
+          .includes(termino) ||
+        String(evaluacion.auditor || "")
+          .toLocaleLowerCase("es")
+          .includes(termino);
+
+      const coincideResultado =
+        resultadoFiltro === "todos" ||
+        (resultadoFiltro === "aprobado" && evaluacion.aprobado) ||
+        (resultadoFiltro === "no_aprobado" && !evaluacion.aprobado);
+
+      const coincideReconocimiento =
+        reconocimientoFiltro === "todos" ||
+        Number(evaluacion.porcentaje || 0) >= 90;
+
+      return (
+        coincideBusqueda &&
+        coincideResultado &&
+        coincideReconocimiento &&
+        cumplePeriodo(evaluacion.fecha)
+      );
+    });
+
+    return [...filtrado].sort((a, b) => {
+      const fechaA = new Date(a.fecha).getTime();
+      const fechaB = new Date(b.fecha).getTime();
+      const porcentajeA = Number(a.porcentaje || 0);
+      const porcentajeB = Number(b.porcentaje || 0);
+      const puntajeA = Number(a.puntaje_obtenido || 0);
+      const puntajeB = Number(b.puntaje_obtenido || 0);
+      const colaboradorA = String(a.colaborador || "");
+      const colaboradorB = String(b.colaborador || "");
+
+      switch (orden) {
+        case "fecha_asc":
+          return fechaA - fechaB;
+        case "porcentaje_desc":
+          return porcentajeB - porcentajeA;
+        case "porcentaje_asc":
+          return porcentajeA - porcentajeB;
+        case "puntaje_desc":
+          return puntajeB - puntajeA;
+        case "puntaje_asc":
+          return puntajeA - puntajeB;
+        case "colaborador_asc":
+          return colaboradorA.localeCompare(colaboradorB, "es");
+        case "colaborador_desc":
+          return colaboradorB.localeCompare(colaboradorA, "es");
+        case "fecha_desc":
+        default:
+          return fechaB - fechaA;
+      }
+    });
+  }, [
+    historial,
+    busqueda,
+    periodo,
+    resultadoFiltro,
+    reconocimientoFiltro,
+    orden,
+  ]);
+
+  const resumenHistorial = useMemo(() => {
+    const total = historialFiltrado.length;
+    const aprobados = historialFiltrado.filter(
+      (evaluacion) => evaluacion.aprobado
+    ).length;
+    const reconocimientos = historialFiltrado.filter(
+      (evaluacion) => Number(evaluacion.porcentaje || 0) >= 90
+    ).length;
+    const promedio = total
+      ? historialFiltrado.reduce(
+          (suma, evaluacion) =>
+            suma + Number(evaluacion.porcentaje || 0),
+          0
+        ) / total
+      : 0;
+
+    return {
+      total,
+      aprobados,
+      noAprobados: total - aprobados,
+      reconocimientos,
+      promedio,
+    };
+  }, [historialFiltrado]);
+
+  function obtenerClaveGrupo(fechaValor) {
+    const fecha = new Date(fechaValor);
+    if (Number.isNaN(fecha.getTime())) return "Sin fecha";
+
+    if (agrupacion === "dia") {
+      return new Intl.DateTimeFormat("es-GT", {
+        dateStyle: "full",
+      }).format(fecha);
+    }
+
+    if (agrupacion === "semana") {
+      const inicio = obtenerInicioSemana(fecha);
+      const fin = new Date(inicio);
+      fin.setDate(fin.getDate() + 6);
+
+      const formato = new Intl.DateTimeFormat("es-GT", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+
+      return `${formato.format(inicio)} – ${formato.format(fin)}`;
+    }
+
+    return new Intl.DateTimeFormat("es-GT", {
+      month: "long",
+      year: "numeric",
+    }).format(fecha);
+  }
+
+  const gruposHistorial = useMemo(() => {
+    return historialFiltrado.reduce((acumulador, evaluacion) => {
+      const clave = obtenerClaveGrupo(evaluacion.fecha);
+
+      if (!acumulador[clave]) acumulador[clave] = [];
+      acumulador[clave].push(evaluacion);
+      return acumulador;
+    }, {});
+  }, [historialFiltrado, agrupacion]);
+
+  useEffect(() => {
+    const claves = Object.keys(gruposHistorial);
+    if (claves.length === 0) return;
+
+    setGruposAbiertos((anterior) => {
+      const siguiente = { ...anterior };
+      if (!Object.values(siguiente).some(Boolean)) {
+        siguiente[claves[0]] = true;
+      }
+      return siguiente;
+    });
+  }, [gruposHistorial]);
+
+  function alternarGrupo(clave) {
+    setGruposAbiertos((anterior) => ({
+      ...anterior,
+      [clave]: !anterior[clave],
+    }));
+  }
+
+  function limpiarFiltros() {
+    setBusqueda("");
+    setPeriodo("todos");
+    setResultadoFiltro("todos");
+    setReconocimientoFiltro("todos");
+    setOrden("fecha_desc");
+    setAgrupacion("mes");
+  }
+
+  async function exportarAExcel(exportarTodo = false) {
+    setExportandoExcel(true);
+    setMensaje(null);
+
+    try {
+      const evaluaciones = exportarTodo ? historial : historialFiltrado;
+
       if (evaluaciones.length === 0) {
         setMensaje({
           tipo: "error",
-          texto: "No hay evaluaciones registradas para exportar.",
+          texto: "No hay evaluaciones para exportar con los filtros actuales.",
         });
         return;
       }
 
-      const encabezados = [
-        "ID",
-        "Fecha",
-        "Colaborador",
-        "Auditor",
-        "Puntaje obtenido",
-        "Puntaje máximo",
-        "Porcentaje",
-        "Resultado",
-        "Observaciones generales",
-      ];
+      const datos = evaluaciones.map((evaluacion) => ({
+        ID: evaluacion.id,
+        Fecha: new Date(evaluacion.fecha),
+        Colaborador: evaluacion.colaborador || "",
+        Auditor: evaluacion.auditor || "",
+        "Puntaje obtenido": Number(evaluacion.puntaje_obtenido || 0),
+        "Puntaje máximo": Number(evaluacion.puntaje_maximo || 0),
+        Porcentaje: Number(evaluacion.porcentaje || 0),
+        Resultado: evaluacion.aprobado ? "Aprobado" : "No aprobado",
+        "Observaciones generales": evaluacion.observaciones || "",
+      }));
 
-      const filas = evaluaciones.map((evaluacion) => {
-        const fecha = new Date(evaluacion.fecha);
-
-        return [
-          evaluacion.id ?? "",
-          Number.isNaN(fecha.getTime()) ? evaluacion.fecha || "" : fecha,
-          evaluacion.colaborador || "",
-          evaluacion.auditor || "",
-          Number(evaluacion.puntaje_obtenido || 0),
-          Number(evaluacion.puntaje_maximo || 0),
-          Number(evaluacion.porcentaje || 0),
-          evaluacion.aprobado ? "Aprobado" : "No aprobado",
-          evaluacion.observaciones || "",
-        ];
-      });
-
-      const datosHoja = [
-        ["Evaluaciones de Conocimientos de Seguridad"],
-        encabezados,
-        ...filas,
-      ];
-
-      const hoja = XLSX.utils.aoa_to_sheet(datosHoja, {
-        cellDates: true,
-      });
-
-      hoja["!merges"] = [
-        {
-          s: { r: 0, c: 0 },
-          e: { r: 0, c: encabezados.length - 1 },
-        },
-      ];
-
+      const hoja = XLSX.utils.json_to_sheet(datos);
+      hoja["!autofilter"] = { ref: hoja["!ref"] };
       hoja["!cols"] = [
         { wch: 12 },
-        { wch: 21 },
+        { wch: 20 },
         { wch: 28 },
         { wch: 28 },
-        { wch: 18 },
-        { wch: 18 },
-        { wch: 15 },
+        { wch: 17 },
         { wch: 16 },
-        { wch: 42 },
+        { wch: 14 },
+        { wch: 16 },
+        { wch: 45 },
       ];
 
-      hoja["!autofilter"] = {
-        ref: `A2:I${filas.length + 2}`,
-      };
+      for (let fila = 2; fila <= datos.length + 1; fila += 1) {
+        const celdaFecha = hoja[`B${fila}`];
+        const celdaPorcentaje = hoja[`G${fila}`];
 
-      for (let indice = 0; indice < filas.length; indice += 1) {
-        const numeroFilaExcel = indice + 3;
-        const celdaFecha = hoja[`B${numeroFilaExcel}`];
-        const celdaPuntaje = hoja[`E${numeroFilaExcel}`];
-        const celdaMaximo = hoja[`F${numeroFilaExcel}`];
-        const celdaPorcentaje = hoja[`G${numeroFilaExcel}`];
-
-        if (celdaFecha && celdaFecha.t === "d") {
-          celdaFecha.z = "dd/mm/yyyy hh:mm";
-        }
-
-        if (celdaPuntaje) celdaPuntaje.z = "0";
-        if (celdaMaximo) celdaMaximo.z = "0";
+        if (celdaFecha) celdaFecha.z = "dd/mm/yyyy hh:mm";
         if (celdaPorcentaje) celdaPorcentaje.z = "0.00";
       }
 
@@ -328,13 +495,10 @@ export default function EvaluacionConocimientosSeguridad({
       XLSX.utils.book_append_sheet(libro, hoja, "Evaluaciones");
 
       const fechaArchivo = new Date().toISOString().slice(0, 10);
+      const sufijo = exportarTodo ? "Todas" : "Filtradas";
       XLSX.writeFile(
         libro,
-        `Evaluaciones_Conocimientos_${fechaArchivo}.xlsx`,
-        {
-          compression: true,
-          cellDates: true,
-        }
+        `Evaluaciones_Conocimientos_${sufijo}_${fechaArchivo}.xlsx`
       );
 
       setMensaje({
@@ -1190,7 +1354,11 @@ export default function EvaluacionConocimientosSeguridad({
               Historial
             </span>
 
-            <h3>Evaluaciones recientes</h3>
+            <h3>Evaluaciones de conocimientos</h3>
+            <p>
+              Consultá, filtrá y ordená los resultados sin mostrar una tabla
+              extensa permanentemente.
+            </p>
           </div>
 
           <div
@@ -1204,8 +1372,12 @@ export default function EvaluacionConocimientosSeguridad({
             <button
               type="button"
               className="secondary-button"
-              onClick={exportarAExcel}
-              disabled={exportandoExcel || cargandoHistorial}
+              onClick={() => exportarAExcel(false)}
+              disabled={
+                exportandoExcel ||
+                cargandoHistorial ||
+                historialFiltrado.length === 0
+              }
             >
               {exportandoExcel ? (
                 <Loader2
@@ -1215,7 +1387,19 @@ export default function EvaluacionConocimientosSeguridad({
               ) : (
                 <FileSpreadsheet size={17} />
               )}
-              {exportandoExcel ? "Exportando..." : "Exportar a Excel"}
+              Exportar filtrado
+            </button>
+
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => exportarAExcel(true)}
+              disabled={
+                exportandoExcel || cargandoHistorial || historial.length === 0
+              }
+            >
+              <FileSpreadsheet size={17} />
+              Exportar todo
             </button>
 
             <button
@@ -1257,139 +1441,463 @@ export default function EvaluacionConocimientosSeguridad({
             Todavía no hay evaluaciones registradas.
           </div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table
+          <>
+            <div
               style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                minWidth: "850px",
-                background: "#ffffff",
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(150px, 1fr))",
+                gap: "12px",
+                marginBottom: "18px",
               }}
             >
-              <thead>
-                <tr>
-                  {[
-                    "Fecha",
-                    "Colaborador",
-                    "Auditor",
-                    "Puntaje",
-                    "Porcentaje",
-                    "Resultado",
-                  ].map((encabezado) => (
-                    <th
-                      key={encabezado}
-                      style={{
-                        padding: "13px 14px",
-                        textAlign: "left",
-                        fontSize: "12px",
-                        color: "#475467",
-                        background: "#f9fafb",
-                        borderBottom: "1px solid #eaecf0",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {encabezado}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+              {[
+                ["Evaluaciones", resumenHistorial.total],
+                ["Promedio", `${resumenHistorial.promedio.toFixed(2)} %`],
+                ["Aprobados", resumenHistorial.aprobados],
+                ["No aprobados", resumenHistorial.noAprobados],
+                ["90 % o más", resumenHistorial.reconocimientos],
+              ].map(([etiqueta, valor]) => (
+                <div
+                  key={etiqueta}
+                  className="context-item"
+                  style={{
+                    padding: "16px",
+                    border: "1px solid #eaecf0",
+                    borderRadius: "12px",
+                    background: "#ffffff",
+                  }}
+                >
+                  <span>{etiqueta}</span>
+                  <strong style={{ fontSize: "22px" }}>{valor}</strong>
+                </div>
+              ))}
+            </div>
 
-              <tbody>
-                {historial.map((evaluacion) => (
-                  <tr key={evaluacion.id}>
-                    <td
-                      style={{
-                        padding: "14px",
-                        borderBottom: "1px solid #eaecf0",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {new Intl.DateTimeFormat("es-GT", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      }).format(new Date(evaluacion.fecha))}
-                    </td>
+            <div
+              style={{
+                padding: "18px",
+                border: "1px solid #e4e7ec",
+                borderRadius: "14px",
+                background: "#f9fafb",
+                marginBottom: "16px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "14px",
+                  fontWeight: 800,
+                  color: "#344054",
+                }}
+              >
+                <SlidersHorizontal size={18} />
+                Filtros y orden
+              </div>
 
-                    <td
-                      style={{
-                        padding: "14px",
-                        borderBottom: "1px solid #eaecf0",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {evaluacion.colaborador}
-                    </td>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(190px, 1fr))",
+                  gap: "12px",
+                }}
+              >
+                <label className="form-field">
+                  <span>
+                    <Search size={16} />
+                    Colaborador o auditor
+                  </span>
+                  <input
+                    type="search"
+                    value={busqueda}
+                    onChange={(event) => setBusqueda(event.target.value)}
+                    placeholder="Buscar por nombre..."
+                  />
+                </label>
 
-                    <td
-                      style={{
-                        padding: "14px",
-                        borderBottom: "1px solid #eaecf0",
-                      }}
-                    >
-                      {evaluacion.auditor}
-                    </td>
+                <label className="form-field">
+                  <span>Periodo</span>
+                  <select
+                    value={periodo}
+                    onChange={(event) => setPeriodo(event.target.value)}
+                  >
+                    <option value="todos">Todos</option>
+                    <option value="semana">Esta semana</option>
+                    <option value="mes">Este mes</option>
+                    <option value="anio">Este año</option>
+                  </select>
+                </label>
 
-                    <td
-                      style={{
-                        padding: "14px",
-                        borderBottom: "1px solid #eaecf0",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {evaluacion.puntaje_obtenido} /{" "}
-                      {evaluacion.puntaje_maximo}
-                    </td>
+                <label className="form-field">
+                  <span>Resultado</span>
+                  <select
+                    value={resultadoFiltro}
+                    onChange={(event) =>
+                      setResultadoFiltro(event.target.value)
+                    }
+                  >
+                    <option value="todos">Todos</option>
+                    <option value="aprobado">Aprobados</option>
+                    <option value="no_aprobado">No aprobados</option>
+                  </select>
+                </label>
 
-                    <td
-                      style={{
-                        padding: "14px",
-                        borderBottom: "1px solid #eaecf0",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {Number(evaluacion.porcentaje).toFixed(2)} %
-                    </td>
+                <label className="form-field">
+                  <span>
+                    <Award size={16} />
+                    Reconocimiento
+                  </span>
+                  <select
+                    value={reconocimientoFiltro}
+                    onChange={(event) =>
+                      setReconocimientoFiltro(event.target.value)
+                    }
+                  >
+                    <option value="todos">Todos</option>
+                    <option value="90_mas">90 % o más</option>
+                  </select>
+                </label>
 
-                    <td
-                      style={{
-                        padding: "14px",
-                        borderBottom: "1px solid #eaecf0",
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "6px",
-                          padding: "6px 10px",
-                          borderRadius: "999px",
-                          background: evaluacion.aprobado
-                            ? "#ecfdf3"
-                            : "#fff1f2",
-                          color: evaluacion.aprobado
-                            ? "#027a48"
-                            : "#b42318",
-                          fontSize: "12px",
-                          fontWeight: 800,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {evaluacion.aprobado ? (
-                          <CheckCircle2 size={14} />
-                        ) : (
-                          <XCircle size={14} />
-                        )}
+                <label className="form-field">
+                  <span>Ordenar por</span>
+                  <select
+                    value={orden}
+                    onChange={(event) => setOrden(event.target.value)}
+                  >
+                    <option value="fecha_desc">Fecha más reciente</option>
+                    <option value="fecha_asc">Fecha más antigua</option>
+                    <option value="porcentaje_desc">
+                      Porcentaje mayor a menor
+                    </option>
+                    <option value="porcentaje_asc">
+                      Porcentaje menor a mayor
+                    </option>
+                    <option value="puntaje_desc">
+                      Puntaje mayor a menor
+                    </option>
+                    <option value="puntaje_asc">
+                      Puntaje menor a mayor
+                    </option>
+                    <option value="colaborador_asc">
+                      Colaborador A–Z
+                    </option>
+                    <option value="colaborador_desc">
+                      Colaborador Z–A
+                    </option>
+                  </select>
+                </label>
 
-                        {evaluacion.aprobado
-                          ? "Aprobado"
-                          : "No aprobado"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                <label className="form-field">
+                  <span>Agrupar por</span>
+                  <select
+                    value={agrupacion}
+                    onChange={(event) => {
+                      setAgrupacion(event.target.value);
+                      setGruposAbiertos({});
+                    }}
+                  >
+                    <option value="mes">Mes</option>
+                    <option value="semana">Semana</option>
+                    <option value="dia">Día</option>
+                  </select>
+                </label>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginTop: "14px",
+                }}
+              >
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={limpiarFiltros}
+                >
+                  <RotateCcw size={16} />
+                  Limpiar filtros
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setHistorialVisible((visible) => !visible)}
+              style={{
+                width: "100%",
+                padding: "16px 18px",
+                borderRadius: "12px",
+                border: "1px solid #d0d5dd",
+                background: "#ffffff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+                cursor: "pointer",
+                color: "#101828",
+                fontWeight: 800,
+              }}
+            >
+              <span>
+                {historialVisible ? "Ocultar" : "Mostrar"} historial (
+                {historialFiltrado.length})
+              </span>
+              {historialVisible ? (
+                <ChevronDown size={20} />
+              ) : (
+                <ChevronRight size={20} />
+              )}
+            </button>
+
+            {historialVisible && (
+              <div
+                style={{
+                  display: "grid",
+                  gap: "12px",
+                  marginTop: "14px",
+                }}
+              >
+                {historialFiltrado.length === 0 ? (
+                  <div
+                    style={{
+                      padding: "30px",
+                      textAlign: "center",
+                      color: "#667085",
+                      border: "1px dashed #d0d5dd",
+                      borderRadius: "12px",
+                    }}
+                  >
+                    No hay evaluaciones que coincidan con los filtros.
+                  </div>
+                ) : (
+                  Object.entries(gruposHistorial).map(
+                    ([clave, evaluacionesGrupo]) => {
+                      const abierto = Boolean(gruposAbiertos[clave]);
+                      const promedioGrupo =
+                        evaluacionesGrupo.reduce(
+                          (suma, evaluacion) =>
+                            suma + Number(evaluacion.porcentaje || 0),
+                          0
+                        ) / evaluacionesGrupo.length;
+
+                      return (
+                        <div
+                          key={clave}
+                          style={{
+                            border: "1px solid #e4e7ec",
+                            borderRadius: "14px",
+                            overflow: "hidden",
+                            background: "#ffffff",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => alternarGrupo(clave)}
+                            style={{
+                              width: "100%",
+                              padding: "16px 18px",
+                              border: 0,
+                              background: "#f9fafb",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "14px",
+                              cursor: "pointer",
+                              textAlign: "left",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "10px",
+                              }}
+                            >
+                              {abierto ? (
+                                <ChevronDown size={19} />
+                              ) : (
+                                <ChevronRight size={19} />
+                              )}
+                              <div>
+                                <strong
+                                  style={{
+                                    display: "block",
+                                    textTransform: "capitalize",
+                                    color: "#101828",
+                                  }}
+                                >
+                                  {clave}
+                                </strong>
+                                <span
+                                  style={{
+                                    color: "#667085",
+                                    fontSize: "12px",
+                                  }}
+                                >
+                                  {evaluacionesGrupo.length} evaluaciones ·
+                                  Promedio {promedioGrupo.toFixed(2)} %
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+
+                          {abierto && (
+                            <div style={{ overflowX: "auto" }}>
+                              <table
+                                style={{
+                                  width: "100%",
+                                  borderCollapse: "collapse",
+                                  minWidth: "850px",
+                                }}
+                              >
+                                <thead>
+                                  <tr>
+                                    {[
+                                      "Fecha",
+                                      "Colaborador",
+                                      "Auditor",
+                                      "Puntaje",
+                                      "Porcentaje",
+                                      "Resultado",
+                                    ].map((encabezado) => (
+                                      <th
+                                        key={encabezado}
+                                        style={{
+                                          padding: "12px 14px",
+                                          textAlign: "left",
+                                          fontSize: "12px",
+                                          color: "#475467",
+                                          background: "#ffffff",
+                                          borderBottom:
+                                            "1px solid #eaecf0",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        {encabezado}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+
+                                <tbody>
+                                  {evaluacionesGrupo.map((evaluacion) => (
+                                    <tr key={evaluacion.id}>
+                                      <td
+                                        style={{
+                                          padding: "13px 14px",
+                                          borderBottom:
+                                            "1px solid #eaecf0",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        {new Intl.DateTimeFormat("es-GT", {
+                                          dateStyle: "medium",
+                                          timeStyle: "short",
+                                        }).format(
+                                          new Date(evaluacion.fecha)
+                                        )}
+                                      </td>
+
+                                      <td
+                                        style={{
+                                          padding: "13px 14px",
+                                          borderBottom:
+                                            "1px solid #eaecf0",
+                                          fontWeight: 700,
+                                        }}
+                                      >
+                                        {evaluacion.colaborador}
+                                      </td>
+
+                                      <td
+                                        style={{
+                                          padding: "13px 14px",
+                                          borderBottom:
+                                            "1px solid #eaecf0",
+                                        }}
+                                      >
+                                        {evaluacion.auditor}
+                                      </td>
+
+                                      <td
+                                        style={{
+                                          padding: "13px 14px",
+                                          borderBottom:
+                                            "1px solid #eaecf0",
+                                          fontWeight: 700,
+                                        }}
+                                      >
+                                        {evaluacion.puntaje_obtenido} /{" "}
+                                        {evaluacion.puntaje_maximo}
+                                      </td>
+
+                                      <td
+                                        style={{
+                                          padding: "13px 14px",
+                                          borderBottom:
+                                            "1px solid #eaecf0",
+                                          fontWeight: 800,
+                                        }}
+                                      >
+                                        {Number(
+                                          evaluacion.porcentaje
+                                        ).toFixed(2)}{" "}
+                                        %
+                                      </td>
+
+                                      <td
+                                        style={{
+                                          padding: "13px 14px",
+                                          borderBottom:
+                                            "1px solid #eaecf0",
+                                        }}
+                                      >
+                                        <span
+                                          style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "6px",
+                                            padding: "6px 10px",
+                                            borderRadius: "999px",
+                                            background: evaluacion.aprobado
+                                              ? "#ecfdf3"
+                                              : "#fff1f2",
+                                            color: evaluacion.aprobado
+                                              ? "#027a48"
+                                              : "#b42318",
+                                            fontSize: "12px",
+                                            fontWeight: 800,
+                                            whiteSpace: "nowrap",
+                                          }}
+                                        >
+                                          {evaluacion.aprobado ? (
+                                            <CheckCircle2 size={14} />
+                                          ) : (
+                                            <XCircle size={14} />
+                                          )}
+                                          {evaluacion.aprobado
+                                            ? "Aprobado"
+                                            : "No aprobado"}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                  )
+                )}
+              </div>
+            )}
+          </>
         )}
       </section>
     </>
