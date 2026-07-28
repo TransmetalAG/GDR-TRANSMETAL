@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { supabase } from "../lib/supabase.js";
+import * as XLSX from "xlsx";
 
 const PREGUNTAS = [
   {
@@ -211,15 +212,6 @@ export default function EvaluacionConocimientosSeguridad({
     setCargandoHistorial(false);
   }
 
-  function escaparXml(valor) {
-    return String(valor ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&apos;");
-  }
-
   async function exportarAExcel() {
     setExportandoExcel(true);
     setMensaje(null);
@@ -255,42 +247,6 @@ export default function EvaluacionConocimientosSeguridad({
         return;
       }
 
-      const filas = evaluaciones
-        .map((evaluacion) => {
-          const fecha = new Date(evaluacion.fecha);
-          const fechaTexto = Number.isNaN(fecha.getTime())
-            ? evaluacion.fecha || ""
-            : new Intl.DateTimeFormat("es-GT", {
-                dateStyle: "short",
-                timeStyle: "short",
-              }).format(fecha);
-
-          const celdas = [
-            evaluacion.id,
-            fechaTexto,
-            evaluacion.colaborador,
-            evaluacion.auditor,
-            evaluacion.puntaje_obtenido,
-            evaluacion.puntaje_maximo,
-            Number(evaluacion.porcentaje || 0).toFixed(2),
-            evaluacion.aprobado ? "Aprobado" : "No aprobado",
-            evaluacion.observaciones || "",
-          ];
-
-          return `
-            <Row>
-              ${celdas
-                .map(
-                  (celda, indice) =>
-                    `<Cell ss:StyleID="${
-                      indice === 6 ? "Porcentaje" : "Datos"
-                    }"><Data ss:Type="String">${escaparXml(celda)}</Data></Cell>`
-                )
-                .join("")}
-            </Row>`;
-        })
-        .join("");
-
       const encabezados = [
         "ID",
         "Fecha",
@@ -303,101 +259,83 @@ export default function EvaluacionConocimientosSeguridad({
         "Observaciones generales",
       ];
 
-      const libroExcel = `<?xml version="1.0" encoding="UTF-8"?>
-        <?mso-application progid="Excel.Sheet"?>
-        <Workbook
-          xmlns="urn:schemas-microsoft-com:office:spreadsheet"
-          xmlns:o="urn:schemas-microsoft-com:office:office"
-          xmlns:x="urn:schemas-microsoft-com:office:excel"
-          xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
-          xmlns:html="http://www.w3.org/TR/REC-html40">
-          <Styles>
-            <Style ss:ID="Default" ss:Name="Normal">
-              <Alignment ss:Vertical="Center"/>
-              <Font ss:FontName="Calibri" ss:Size="11"/>
-            </Style>
-            <Style ss:ID="Titulo">
-              <Font ss:FontName="Calibri" ss:Size="16" ss:Bold="1"/>
-              <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
-            </Style>
-            <Style ss:ID="Encabezado">
-              <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/>
-              <Interior ss:Color="#155EEF" ss:Pattern="Solid"/>
-              <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>
-              <Borders>
-                <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D0D5DD"/>
-                <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D0D5DD"/>
-                <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D0D5DD"/>
-                <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D0D5DD"/>
-              </Borders>
-            </Style>
-            <Style ss:ID="Datos">
-              <Alignment ss:Vertical="Center" ss:WrapText="1"/>
-              <Borders>
-                <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#EAECF0"/>
-              </Borders>
-            </Style>
-            <Style ss:ID="Porcentaje">
-              <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
-              <Borders>
-                <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#EAECF0"/>
-              </Borders>
-            </Style>
-          </Styles>
-          <Worksheet ss:Name="Evaluaciones">
-            <Table>
-              <Column ss:Width="70"/>
-              <Column ss:Width="125"/>
-              <Column ss:Width="180"/>
-              <Column ss:Width="180"/>
-              <Column ss:Width="95"/>
-              <Column ss:Width="95"/>
-              <Column ss:Width="90"/>
-              <Column ss:Width="105"/>
-              <Column ss:Width="260"/>
-              <Row ss:Height="28">
-                <Cell ss:MergeAcross="8" ss:StyleID="Titulo">
-                  <Data ss:Type="String">Evaluaciones de Conocimientos de Seguridad</Data>
-                </Cell>
-              </Row>
-              <Row ss:Height="30">
-                ${encabezados
-                  .map(
-                    (encabezado) =>
-                      `<Cell ss:StyleID="Encabezado"><Data ss:Type="String">${escaparXml(
-                        encabezado
-                      )}</Data></Cell>`
-                  )
-                  .join("")}
-              </Row>
-              ${filas}
-            </Table>
-            <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
-              <FreezePanes/>
-              <FrozenNoSplit/>
-              <SplitHorizontal>2</SplitHorizontal>
-              <TopRowBottomPane>2</TopRowBottomPane>
-              <ActivePane>2</ActivePane>
-              <ProtectObjects>False</ProtectObjects>
-              <ProtectScenarios>False</ProtectScenarios>
-            </WorksheetOptions>
-          </Worksheet>
-        </Workbook>`;
+      const filas = evaluaciones.map((evaluacion) => {
+        const fecha = new Date(evaluacion.fecha);
 
-      const blob = new Blob([libroExcel], {
-        type: "application/vnd.ms-excel;charset=utf-8",
+        return [
+          evaluacion.id ?? "",
+          Number.isNaN(fecha.getTime()) ? evaluacion.fecha || "" : fecha,
+          evaluacion.colaborador || "",
+          evaluacion.auditor || "",
+          Number(evaluacion.puntaje_obtenido || 0),
+          Number(evaluacion.puntaje_maximo || 0),
+          Number(evaluacion.porcentaje || 0),
+          evaluacion.aprobado ? "Aprobado" : "No aprobado",
+          evaluacion.observaciones || "",
+        ];
       });
 
-      const fechaArchivo = new Date().toISOString().slice(0, 10);
-      const url = URL.createObjectURL(blob);
-      const enlace = document.createElement("a");
+      const datosHoja = [
+        ["Evaluaciones de Conocimientos de Seguridad"],
+        encabezados,
+        ...filas,
+      ];
 
-      enlace.href = url;
-      enlace.download = `Evaluaciones_Conocimientos_${fechaArchivo}.xls`;
-      document.body.appendChild(enlace);
-      enlace.click();
-      enlace.remove();
-      URL.revokeObjectURL(url);
+      const hoja = XLSX.utils.aoa_to_sheet(datosHoja, {
+        cellDates: true,
+      });
+
+      hoja["!merges"] = [
+        {
+          s: { r: 0, c: 0 },
+          e: { r: 0, c: encabezados.length - 1 },
+        },
+      ];
+
+      hoja["!cols"] = [
+        { wch: 12 },
+        { wch: 21 },
+        { wch: 28 },
+        { wch: 28 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 15 },
+        { wch: 16 },
+        { wch: 42 },
+      ];
+
+      hoja["!autofilter"] = {
+        ref: `A2:I${filas.length + 2}`,
+      };
+
+      for (let indice = 0; indice < filas.length; indice += 1) {
+        const numeroFilaExcel = indice + 3;
+        const celdaFecha = hoja[`B${numeroFilaExcel}`];
+        const celdaPuntaje = hoja[`E${numeroFilaExcel}`];
+        const celdaMaximo = hoja[`F${numeroFilaExcel}`];
+        const celdaPorcentaje = hoja[`G${numeroFilaExcel}`];
+
+        if (celdaFecha && celdaFecha.t === "d") {
+          celdaFecha.z = "dd/mm/yyyy hh:mm";
+        }
+
+        if (celdaPuntaje) celdaPuntaje.z = "0";
+        if (celdaMaximo) celdaMaximo.z = "0";
+        if (celdaPorcentaje) celdaPorcentaje.z = "0.00";
+      }
+
+      const libro = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(libro, hoja, "Evaluaciones");
+
+      const fechaArchivo = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(
+        libro,
+        `Evaluaciones_Conocimientos_${fechaArchivo}.xlsx`,
+        {
+          compression: true,
+          cellDates: true,
+        }
+      );
 
       setMensaje({
         tipo: "exito",
