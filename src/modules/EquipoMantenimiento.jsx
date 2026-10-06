@@ -17,7 +17,7 @@ const TECNICOS = [
   "Edvin Telles",
   "Carlos Carcuz",
   "Erwin Haz",
-  "Anderson López",
+  "José Bernardo Gómez",
 ];
 
 function formatDate(dateString) {
