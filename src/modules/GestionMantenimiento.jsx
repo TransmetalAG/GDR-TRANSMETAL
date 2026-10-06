@@ -109,7 +109,7 @@ function GestionMantenimiento() {
     "Edvin Telles": CAPACIDAD_DEFAULT,
     "Carlos Carcuz": CAPACIDAD_DEFAULT,
     "Erwin Haz": CAPACIDAD_DEFAULT,
-    "Anderson López": CAPACIDAD_DEFAULT,
+    "José Bernardo Gómez": CAPACIDAD_DEFAULT,
   });
 
   const [filtros, setFiltros] = useState({
