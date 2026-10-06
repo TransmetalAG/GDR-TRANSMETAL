@@ -24,7 +24,7 @@ const TECNICOS = [
   "Edvin Telles",
   "Carlos Carcuz",
   "Erwin Haz",
-  "Anderson López",
+  "José Bernardo Gómez",
 ];
 
 const CAPACIDAD_DEFAULT = 40;
