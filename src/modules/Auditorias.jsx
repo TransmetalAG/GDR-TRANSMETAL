@@ -8,7 +8,7 @@ import {
   ArrowLeft
 } from "lucide-react";
 
-import AuditoriaCEP from "./auditorias/AuditoriaCEP.jsx";
+import AuditoriaCEP from "./Auditorias/AuditoriaCEP.jsx";
 
 const opciones = [
   {
