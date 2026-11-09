@@ -1,95 +1,111 @@
-import React, { useEffect, useMemo, useState } from "react";
-import {
-  ClipboardList,
-  Plus,
-  Trash2,
-  X,
-  CheckCircle2,
-  Wrench,
-  ArrowRight,
-} from "lucide-react";
+                  style={{
+                    color: "#667085",
+                    fontSize: "13px",
+                    margin: "6px 0 18px",
+                  }}
+                >
+                  Se creará como Pendiente de asignación.
+                </p>
+              </div>
 
-import { catalogo } from "../data/CatalogoMaquinas.js";
-import { supabase } from "../lib/supabase.js";
+              <button
+                type="button"
+                onClick={() => setAccionParaMantenimiento(null)}
+                disabled={enviandoMantenimiento}
+                style={{
+                  border: 0,
+                  background: "transparent",
+                  cursor: "pointer",
+                  padding: "4px",
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
 
-const ESTADOS = [
-  "Sin planificar",
-  "Pendiente",
-  "En proceso",
-  "Terminada",
-];
+            <div style={{ display: "grid", gap: "12px" }}>
+              <div>
+                <strong>Equipo</strong>
+                <div>{accionParaMantenimiento.equipo}</div>
+              </div>
 
-const PILARES = [
-  "Seguridad",
-  "Calidad",
-  "Proceso / Productividad",
-  "Otro",
-];
+              <div>
+                <strong>Causa / Hallazgo</strong>
+                <div>{accionParaMantenimiento.causa}</div>
+              </div>
 
-function toDateString(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+              <div>
+                <strong>Qué / Trabajo a realizar</strong>
+                <div>{accionParaMantenimiento.que}</div>
+              </div>
+
+              <label>
+                <strong
+                  style={{
+                    display: "block",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Prioridad
+                </strong>
+
+                <select
+                  value={prioridadMantenimiento}
+                  onChange={(event) =>
+                    setPrioridadMantenimiento(event.target.value)
+                  }
+                  disabled={enviandoMantenimiento}
+                  style={{
+                    width: "100%",
+                    minHeight: "42px",
+                    border: "1px solid #d0d5dd",
+                    borderRadius: "8px",
+                    padding: "0 10px",
+                    background: "#fff",
+                  }}
+                >
+                  <option value="Baja">Baja</option>
+                  <option value="Media">Media</option>
+                  <option value="Alta">Alta</option>
+                  <option value="Crítica">Crítica</option>
+                </select>
+              </label>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "10px",
+                marginTop: "20px",
+              }}
+            >
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setAccionParaMantenimiento(null)}
+                disabled={enviandoMantenimiento}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className="primary-button"
+                onClick={enviarAMantenimiento}
+                disabled={enviandoMantenimiento}
+              >
+                <Wrench size={17} />
+                {enviandoMantenimiento
+                  ? "Enviando..."
+                  : "Enviar a Mantenimiento"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
-function formatDate(dateString) {
-  if (!dateString) return "Sin fecha";
-
-  return new Intl.DateTimeFormat("es-GT", {
-    dateStyle: "medium",
-  }).format(new Date(`${dateString}T12:00:00`));
-}
-
-// Fuente visible; conservamos "origen" y "pilar" originales en Supabase.
-function mostrarFuente(accion) {
-  if (accion.origen === "Gemba") {
-    return accion.pilar ? `Gemba – ${accion.pilar}` : "Gemba";
-  }
-  return accion.origen || "Manual";
-}
-
-// Resume en la matriz los hallazgos CEP sin alterar el texto almacenado.
-function mostrarCausa(accion) {
-  const original = accion.causa || "";
-  if (accion.origen !== "Auditoría CEP") return original;
-  const match = original.match(/^CEP \[[^\]]+\] \[([^\]]+)\]:[\s\S]*?\s\| Observación:\s*([\s\S]*)$/);
-  return match ? `${match[1]} – ${match[2]}` : original;
-}
-
-function normalizarAccion(row) {
-  const esGembaSinPlan =
-    row.origen === "Gemba" &&
-    !row.que &&
-    !row.como &&
-    !row.responsable &&
-    !row.fecha_compromiso;
-
-  return {
-    id: row.id,
-    origen: row.origen || "Manual",
-    pilar: row.pilar || "",
-    auditor: row.auditor || "",
-    equipo: row.maquina || "",
-    causa: row.hallazgo || "",
-    que: row.que || "",
-    como: row.como || "",
-    quien: row.responsable || "",
-    cuando: row.fecha_compromiso || "",
-    estado:
-      esGembaSinPlan
-        ? "Sin planificar"
-        : row.estado || "Pendiente",
-    fechaCierre: row.fecha_cierre || null,
-  };
-}
-
-function PlanAccion() {
-  const currentUser = useMemo(() => {
-    try {
-      const savedUser = localStorage.getItem("gdr_user");
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch {
-      return null;
-    }
-  }, []);
+export default PlanAccion;
