@@ -1,96 +1,106 @@
-import React, { useEffect, useMemo, useState } from "react";
-import {
-  Footprints,
-  ShieldCheck,
-  Award,
-  Gauge,
-  Wrench,
-  CalendarDays,
-  RefreshCw,
-} from "lucide-react";
+                        padding: "28px",
+                        textAlign: "center",
+                        color: "#667085",
+                      }}
+                    >
+                      No hay Gembas en el período seleccionado.
+                    </td>
+                  </tr>
+                )}
 
-import { supabase } from "../lib/supabase.js";
-import DashboardCEP from "./DashboardCEP.jsx";
+              {cargando && (
+                <tr>
+                  <td
+                    colSpan="7"
+                    style={{
+                      padding: "28px",
+                      textAlign: "center",
+                      color: "#667085",
+                    }}
+                  >
+                    Cargando información...
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-function toLocalDateInput(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+      <section
+        className="section-block"
+        style={{
+          marginTop: "18px",
+        }}
+      >
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">
+              Pilares Gemba
+            </span>
 
-function startOfWeek(date = new Date()) {
-  const copy = new Date(date);
-  const day = copy.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  copy.setDate(copy.getDate() + diff);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
+            <h3>
+              Módulos de observación
+            </h3>
+          </div>
 
-function endOfWeek(date = new Date()) {
-  const copy = startOfWeek(date);
-  copy.setDate(copy.getDate() + 6);
-  copy.setHours(23, 59, 59, 999);
-  return copy;
-}
+          <p>
+            Cuatro enfoques para observar el trabajo real e
+            identificar oportunidades de mejora.
+          </p>
+        </div>
 
-function startOfMonth(date = new Date()) {
-  return new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
-}
+        <div className="module-grid">
+          {modules.map((module) => {
+            const Icon =
+              module.icon ||
+              getIconByModuleId(module.id);
 
-function endOfMonth(date = new Date()) {
-  return new Date(
-    date.getFullYear(),
-    date.getMonth() + 1,
-    0,
-    23,
-    59,
-    59,
-    999
+            return (
+              <article
+                className="module-card"
+                key={module.id}
+              >
+                <div
+                  className={`module-icon ${module.id}`}
+                >
+                  <Icon size={25} />
+                </div>
+
+                <div>
+                  <h4>
+                    {module.name}
+                  </h4>
+
+                  <p>
+                    {module.description}
+                  </p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    </>
   );
 }
 
-function formatDate(dateValue) {
-  if (!dateValue) return "—";
+const cellStyle = {
+  padding: "12px",
+  borderBottom: "1px solid #eef2f6",
+  fontSize: "12px",
+  verticalAlign: "top",
+};
 
-  const date = new Date(dateValue);
+function getIconByModuleId(moduleId) {
+  const icons = {
+    seguridad: ShieldCheck,
+    calidad: Award,
+    proceso: Gauge,
+    mantenimiento: Wrench,
+  };
 
-  if (Number.isNaN(date.getTime())) {
-    return "—";
-  }
-
-  return new Intl.DateTimeFormat("es-GT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(date);
+  return icons[moduleId] || Footprints;
 }
 
-function Dashboard({
-  modules = [],
-  onNewGemba,
-}) {
-  const [periodo, setPeriodo] = useState("mes");
-  const [fechaInicio, setFechaInicio] = useState(() =>
-    toLocalDateInput(startOfMonth(new Date()))
-  );
-  const [fechaFin, setFechaFin] = useState(() =>
-    toLocalDateInput(endOfMonth(new Date()))
-  );
-
-  const [gembas, setGembas] = useState([]);
-  const [accionesPlan, setAccionesPlan] = useState([]);
-  const [tareasMantenimiento, setTareasMantenimiento] = useState([]);
-
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState("");
-
-  function aplicarPeriodo(nuevoPeriodo) {
-    setPeriodo(nuevoPeriodo);
-
-    if (nuevoPeriodo === "semana") {
-      setFechaInicio(toLocalDateInput(startOfWeek(new Date())));
-      setFechaFin(toLocalDateInput(endOfWeek(new Date())));
-      return;
-    }
+export default Dashboard;
