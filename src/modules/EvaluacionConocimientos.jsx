@@ -1,96 +1,47 @@
 import React from "react";
-import {
-  ShieldCheck,
-  ClipboardList,
-  Sparkles,
-  ArrowRight,
-  LockKeyhole,
-  GraduationCap,
-  CheckCircle2,
-  KeyRound,
-} from "lucide-react";
+import { ShieldCheck, KeyRound, ClipboardList, Sparkles, ArrowRight, LockKeyhole } from "lucide-react";
 
-const MODULOS = [
-  {
-    id: "seguridad",
-    titulo: "Seguridad Industrial",
-    descripcion:
-      "Evaluá conocimientos sobre normas, riesgos, EPP y procedimientos críticos de seguridad.",
-    icono: ShieldCheck,
-    estado: "disponible",
-    etiqueta: "Disponible",
-    detalle: "9 preguntas · Resultado automático",
-  },
-  {
-    id: "bloqueos",
-    titulo: "Conocimiento de Bloqueos",
-    descripcion:
-      "Evalúa lo que el colaborador conoce sobre el procedimiento de bloqueo y control de energías peligrosas.",
-    icono: KeyRound,
-    estado: "proximamente",
-    etiqueta: "Por configurar",
-    detalle: "Pendiente de preguntas y criterios oficiales",
-  },
-  {
-    id: "estandares",
-    titulo: "Estándares",
-    descripcion:
-      "Evaluaciones sobre métodos de trabajo, parámetros de operación y cumplimiento de procesos.",
-    icono: ClipboardList,
-    estado: "proximamente",
-    etiqueta: "Próximamente",
-    detalle: "En preparación",
-  },
-  {
-    id: "5s",
-    titulo: "5S",
-    descripcion:
-      "Evaluaciones sobre clasificación, orden, limpieza, estandarización y disciplina.",
-    icono: Sparkles,
-    estado: "proximamente",
-    etiqueta: "Próximamente",
-    detalle: "En preparación",
-  },
+const modulos = [
+  { id: "seguridad", nombre: "Seguridad Industrial", descripcion: "Evaluación actual de conocimientos en seguridad.", icono: ShieldCheck, disponible: true },
+  { id: "bloqueos", nombre: "Conocimiento de Bloqueos", descripcion: "Conocimientos sobre bloqueo y control de energías peligrosas.", icono: KeyRound, disponible: false },
+  { id: "estandares", nombre: "Estándares", descripcion: "Evaluaciones de estándares y procedimientos de trabajo.", icono: ClipboardList, disponible: false },
+  { id: "5s", nombre: "5S", descripcion: "Conocimientos de orden, limpieza y disciplina.", icono: Sparkles, disponible: false },
 ];
 
-export default function EvaluacionConocimientos({
-  onSeleccionarModulo,
-}) {
-  function seleccionarModulo(modulo) {
-    if (modulo.estado !== "disponible") return;
-    onSeleccionarModulo?.(modulo.id);
-  }
-
+export default function EvaluacionConocimientos({ onSeleccionarModulo }) {
   return (
-    <div style={{ width: "100%" }}>
-      <section
-        style={{
-          position: "relative",
-          overflow: "hidden",
-          marginBottom: "28px",
-          padding: "32px",
-          borderRadius: "22px",
-          background:
-            "linear-gradient(135deg, #0f172a 0%, #172554 52%, #1d4ed8 100%)",
-          color: "#ffffff",
-          boxShadow: "0 18px 45px rgba(15, 23, 42, 0.16)",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: "-90px",
-            right: "-60px",
-            width: "260px",
-            height: "260px",
-            borderRadius: "999px",
-            background: "rgba(255,255,255,0.08)",
-          }}
-        />
-
-        <div
-          style={{
-            position: "absolute",
-            right: "130px",
-            bottom: "-120px",
-            width: "220px",
+    <div style={{ width: "100%", paddingBottom: 24 }}>
+      <header style={{ background: "linear-gradient(120deg,#0f172a,#1d4ed8)", color: "white", padding: 28, borderRadius: 18, marginBottom: 24 }}>
+        <h2 style={{ margin: "0 0 8px" }}>Auditoría de Conocimientos</h2>
+        <p style={{ margin: 0, opacity: 0.9 }}>Selecciona la evaluación que deseas realizar.</p>
+      </header>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 18 }}>
+        {modulos.map((modulo) => {
+          const Icono = modulo.icono;
+          return (
+            <button
+              key={modulo.id}
+              type="button"
+              disabled={!modulo.disponible}
+              onClick={() => onSeleccionarModulo?.(modulo.id)}
+              style={{
+                textAlign: "left", borderRadius: 16, border: "1px solid #e2e8f0",
+                padding: 22, background: "white", color: "#0f172a",
+                cursor: modulo.disponible ? "pointer" : "not-allowed",
+                opacity: modulo.disponible ? 1 : 0.72, minHeight: 175,
+              }}
+            >
+              <Icono size={30} color="#2563eb" />
+              <h3 style={{ margin: "14px 0 8px", fontSize: 18 }}>{modulo.nombre}</h3>
+              <p style={{ fontSize: 14, color: "#475569", lineHeight: 1.5 }}>{modulo.descripcion}</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: modulo.disponible ? "#2563eb" : "#64748b", fontWeight: 600, fontSize: 13 }}>
+                {modulo.disponible ? <ArrowRight size={16} /> : <LockKeyhole size={16} />}
+                {modulo.disponible ? "Iniciar evaluación" : "Próximamente"}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
