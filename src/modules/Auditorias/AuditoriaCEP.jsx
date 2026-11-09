@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { ArrowLeft, CheckCircle2, Save, Plus, Trash2, ShieldCheck } from "lucide-react";
-import { supabase } from "../lib/supabase.js";
-import { catalogo } from "../data/CatalogoMaquinas.js";
-import { colaboradores } from "../data/CatalogoColaboradores.js";
+import { supabase } from "../../lib/supabase.js";
+import { catalogo } from "../../data/CatalogoMaquinas.js";
+import { colaboradores } from "../../data/CatalogoColaboradores.js";
 
 // IDs estables: se guardan junto a cada respuesta para permitir futuras versiones del checklist.
 const SECCIONES = [
