@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import {
   ClipboardCheck,
@@ -9,6 +8,7 @@ import {
 } from "lucide-react";
 
 import AuditoriaCEP from "./Auditorias/AuditoriaCEP.jsx";
+import AuditoriaAPRyPT from "./Auditorias/AuditoriaAPRyPT.jsx";
 
 const opciones = [
   {
@@ -37,6 +37,15 @@ export default function Auditorias({ currentUser }) {
   if (seccion === "cep") {
     return (
       <AuditoriaCEP
+        currentUser={currentUser}
+        onBack={() => setSeccion(null)}
+      />
+    );
+  }
+
+  if (seccion === "apr") {
+    return (
+      <AuditoriaAPRyPT
         currentUser={currentUser}
         onBack={() => setSeccion(null)}
       />
@@ -134,7 +143,7 @@ export default function Auditorias({ currentUser }) {
                 {o.detalle}
               </span>
 
-              {o.id !== "cep" && (
+              {o.id === "preuso" && (
                 <small>Próximamente</small>
               )}
             </button>
