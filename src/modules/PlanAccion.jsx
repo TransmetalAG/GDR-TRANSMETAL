@@ -63,6 +63,11 @@ function mostrarCausa(accion) {
     return match ? `${match[1]} – ${match[2]}` : original;
   }
 
+  if (accion.origen === "Auditoría Pre-usos") {
+    const match = original.match(/^PREUSO \[[^\]]+\] \[([^\]]+)\]:[\s\S]*?\s\| Observación:\s*([\s\S]*)$/);
+    return match ? `${match[1]} – ${match[2]}` : original;
+  }
+
   return original;
 }
 
