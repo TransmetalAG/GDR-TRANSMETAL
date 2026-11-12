@@ -49,12 +49,21 @@ function mostrarFuente(accion) {
   return accion.origen || "Manual";
 }
 
-// Resume en la matriz los hallazgos CEP sin alterar el texto almacenado.
+// Resume hallazgos de auditorías sin alterar el texto almacenado en Supabase.
 function mostrarCausa(accion) {
   const original = accion.causa || "";
-  if (accion.origen !== "Auditoría CEP") return original;
-  const match = original.match(/^CEP \[[^\]]+\] \[([^\]]+)\]:[\s\S]*?\s\| Observación:\s*([\s\S]*)$/);
-  return match ? `${match[1]} – ${match[2]}` : original;
+
+  if (accion.origen === "Auditoría CEP") {
+    const match = original.match(/^CEP \[[^\]]+\] \[([^\]]+)\]:[\s\S]*?\s\| Observación:\s*([\s\S]*)$/);
+    return match ? `${match[1]} – ${match[2]}` : original;
+  }
+
+  if (accion.origen === "Auditoría Dispositivos de Seguridad") {
+    const match = original.match(/^DISP-SEG \[[^\]]+\] \[([^\]]+)\]:[\s\S]*?\s\| Observación:\s*([\s\S]*)$/);
+    return match ? `${match[1]} – ${match[2]}` : original;
+  }
+
+  return original;
 }
 
 function normalizarAccion(row) {
