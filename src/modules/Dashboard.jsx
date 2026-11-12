@@ -12,6 +12,7 @@ import {
 
 import { supabase } from "../lib/supabase.js";
 import DashboardCEP from "./DashboardCEP.jsx";
+import DashboardDispositivosSeguridad from "./DashboardDispositivosSeguridad.jsx";
 
 function toLocalDateInput(date) {
   const year = date.getFullYear();
@@ -499,6 +500,8 @@ function Dashboard({
       </section>
 
       <DashboardCEP fechaInicio={fechaInicio} fechaFin={fechaFin} />
+
+      <DashboardDispositivosSeguridad fechaInicio={fechaInicio} fechaFin={fechaFin} />
 
       <section
         className="section-block"
