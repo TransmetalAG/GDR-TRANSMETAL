@@ -1,17 +1,17 @@
-
 import React, { useState } from "react";
 import {
   ClipboardCheck,
   ShieldCheck,
   FileCheck2,
   Truck,
-  ArrowLeft,
-  Siren
+  Siren,
+  ArrowLeft
 } from "lucide-react";
 
 import AuditoriaCEP from "./Auditorias/AuditoriaCEP.jsx";
 import AuditoriaAPRyPT from "./Auditorias/AuditoriaAPRyPT.jsx";
 import AuditoriaDispositivosSeguridad from "./Auditorias/AuditoriaDispositivosSeguridad.jsx";
+import AuditoriaPreusos from "./Auditorias/AuditoriaPreusos.jsx";
 
 const opciones = [
   {
@@ -29,7 +29,7 @@ const opciones = [
   {
     id: "dispositivos",
     titulo: "Auditoría de Dispositivos de Seguridad",
-    detalle: "10 criterios: Hongos de emergencia, cilindros de expulsión, barreras fotoeléctricas y guardas",
+    detalle: "10 criterios: Hongos, cilindros, barreras y guardas",
     icono: Siren
   },
   {
@@ -62,12 +62,11 @@ export default function Auditorias({ currentUser }) {
   }
 
   if (seccion === "dispositivos") {
-    return (
-      <AuditoriaDispositivosSeguridad
-        currentUser={currentUser}
-        onBack={() => setSeccion(null)}
-      />
-    );
+    return <AuditoriaDispositivosSeguridad currentUser={currentUser} onBack={() => setSeccion(null)} />;
+  }
+
+  if (seccion === "preuso") {
+    return <AuditoriaPreusos currentUser={currentUser} onBack={() => setSeccion(null)} />;
   }
 
   return (
@@ -161,9 +160,7 @@ export default function Auditorias({ currentUser }) {
                 {o.detalle}
               </span>
 
-              {o.id === "preuso" && (
-                <small>Próximamente</small>
-              )}
+
             </button>
           ))}
         </div>
