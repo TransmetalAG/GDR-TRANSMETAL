@@ -31,7 +31,7 @@ import Mantenimiento from "./modules/Mantenimiento.jsx";
 import GestionMantenimiento from "./modules/GestionMantenimiento.jsx";
 import EquipoMantenimiento from "./modules/EquipoMantenimiento.jsx";
 import PlanAccion from "./modules/PlanAccion.jsx";
-import Dashboard from "./modules/Dashboard.jsx";
+import DashboardInicio from "./modules/DashboardInicio.jsx";
 import EvaluacionConocimientosSeguridad from "./modules/EvaluacionConocimientosSeguridad.jsx";
 import EvaluacionConocimientos from "./modules/EvaluacionConocimientos.jsx";
 import Auditorias from "./modules/Auditorias.jsx";
@@ -828,7 +828,7 @@ function App() {
 
       <main className="main-content">
         {currentPage === "dashboard" && (
-          <Dashboard
+          <DashboardInicio
             modules={modules}
             onNewGemba={handleNewGemba}
           />
