@@ -1,14 +1,17 @@
+
 import React, { useState } from "react";
 import {
   ClipboardCheck,
   ShieldCheck,
   FileCheck2,
   Truck,
-  ArrowLeft
+  ArrowLeft,
+  Siren
 } from "lucide-react";
 
 import AuditoriaCEP from "./Auditorias/AuditoriaCEP.jsx";
 import AuditoriaAPRyPT from "./Auditorias/AuditoriaAPRyPT.jsx";
+import AuditoriaDispositivosSeguridad from "./Auditorias/AuditoriaDispositivosSeguridad.jsx";
 
 const opciones = [
   {
@@ -22,6 +25,12 @@ const opciones = [
     titulo: "Auditoría APR y PT",
     detalle: "Análisis Previo de Riesgos y Permisos de Trabajo",
     icono: FileCheck2
+  },
+  {
+    id: "dispositivos",
+    titulo: "Auditoría de Dispositivos de Seguridad",
+    detalle: "10 criterios: Hongos de emergencia, cilindros de expulsión, barreras fotoeléctricas y guardas",
+    icono: Siren
   },
   {
     id: "preuso",
@@ -46,6 +55,15 @@ export default function Auditorias({ currentUser }) {
   if (seccion === "apr") {
     return (
       <AuditoriaAPRyPT
+        currentUser={currentUser}
+        onBack={() => setSeccion(null)}
+      />
+    );
+  }
+
+  if (seccion === "dispositivos") {
+    return (
+      <AuditoriaDispositivosSeguridad
         currentUser={currentUser}
         onBack={() => setSeccion(null)}
       />
