@@ -3,7 +3,7 @@ import { ShieldCheck, KeyRound, ClipboardList, Sparkles, ArrowRight, LockKeyhole
 
 const modulos = [
   { id: "seguridad", nombre: "Seguridad Industrial", descripcion: "Evaluación actual de conocimientos en seguridad.", icono: ShieldCheck, disponible: true },
-  { id: "bloqueos", nombre: "Conocimiento de Bloqueos", descripcion: "Conocimientos sobre bloqueo y control de energías peligrosas.", icono: KeyRound, disponible: false },
+  { id: "bloqueos", nombre: "Conocimiento de Bloqueos", descripcion: "Auditoría de conocimientos sobre el Control de Energías Peligrosas (CEP).", icono: KeyRound, disponible: true },
   { id: "estandares", nombre: "Estándares", descripcion: "Evaluaciones de estándares y procedimientos de trabajo.", icono: ClipboardList, disponible: false },
   { id: "5s", nombre: "5S", descripcion: "Conocimientos de orden, limpieza y disciplina.", icono: Sparkles, disponible: false },
 ];
