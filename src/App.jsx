@@ -34,6 +34,7 @@ import PlanAccion from "./modules/PlanAccion.jsx";
 import DashboardInicio from "./modules/DashboardInicio.jsx";
 import EvaluacionConocimientosSeguridad from "./modules/EvaluacionConocimientosSeguridad.jsx";
 import EvaluacionConocimientos from "./modules/EvaluacionConocimientos.jsx";
+import AuditoriaConocimientosCEP from "./modules/Auditorias/AuditoriaConocimientosCEP.jsx";
 import Auditorias from "./modules/Auditorias.jsx";
 
 import ResumenGemba from "./components/ResumenGemba.jsx";
@@ -980,6 +981,8 @@ function App() {
             onSeleccionarModulo={(modulo) => {
               if (modulo === "seguridad") {
                 setCurrentPage("evaluacion-conocimientos-seguridad");
+              } else if (modulo === "bloqueos") {
+                setCurrentPage("auditoria-conocimientos-cep");
               }
             }}
           />
@@ -990,6 +993,13 @@ function App() {
           <EvaluacionConocimientosSeguridad
             currentUser={currentUser}
             colaboradores={colaboradoresOrdenados}
+            onBack={() => setCurrentPage("evaluacion-conocimientos")}
+          />
+        )}
+
+        {currentPage === "auditoria-conocimientos-cep" && (
+          <AuditoriaConocimientosCEP
+            currentUser={currentUser}
             onBack={() => setCurrentPage("evaluacion-conocimientos")}
           />
         )}
