@@ -10,6 +10,7 @@ import DashboardAPRPT from "./DashboardAPRPT.jsx";
 import DashboardPreusos from "./DashboardPreusos.jsx";
 import DashboardDispositivosSeguridad from "./DashboardDispositivosSeguridad.jsx";
 import DashboardConocimientosSeguridad from "./DashboardConocimientosSeguridad.jsx";
+import DashboardConocimientosCEP from "./DashboardConocimientosCEP.jsx";
 
 /* ───────────────────────── Datos ───────────────────────── */
 
@@ -37,7 +38,7 @@ const categorias = [
     opciones: [
       { id: "seguridad", titulo: "Seguridad industrial", detalle: "Resultados de conocimientos y aprobaciones", icono: ShieldCheck },
       { id: "5s", titulo: "5S", detalle: "La evaluación aún no está implementada", icono: Sparkles, pendiente: true },
-      { id: "bloqueos", titulo: "Conocimiento de bloqueos", detalle: "La evaluación aún no está implementada", icono: KeyRound, pendiente: true },
+      { id: "bloqueos", titulo: "Conocimiento de bloqueos", detalle: "Nivel de conocimiento CEP, cobertura y brechas por colaborador", icono: KeyRound },
       { id: "estandares", titulo: "Estándares", detalle: "La evaluación aún no está implementada", icono: ClipboardList, pendiente: true },
     ],
   },
@@ -198,6 +199,7 @@ export default function DashboardInicio({ modules = [], onNewGemba }) {
       {!rangoInvalido && seccion === "preusos" && <DashboardPreusos fechaInicio={fechaInicio} fechaFin={fechaFin} />}
       {!rangoInvalido && seccion === "dispositivos" && <DashboardDispositivosSeguridad fechaInicio={fechaInicio} fechaFin={fechaFin} />}
       {!rangoInvalido && seccion === "seguridad" && <DashboardConocimientosSeguridad fechaInicio={fechaInicio} fechaFin={fechaFin} />}
+      {!rangoInvalido && seccion === "bloqueos" && <DashboardConocimientosCEP fechaInicio={fechaInicio} fechaFin={fechaFin} />}
     </div>
   );
 }
