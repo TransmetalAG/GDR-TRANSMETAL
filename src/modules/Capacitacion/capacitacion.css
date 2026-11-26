@@ -1,0 +1,875 @@
+
+/* ==========================================
+   TRANSMETAL
+   MÓDULO DE GESTIÓN DE CAPACITACIÓN
+   ========================================== */
+
+.cap-root {
+  --cap-primary: #164b83;
+  --cap-primary-dark: #12375e;
+  --cap-primary-light: #eff6ff;
+  --cap-background: #f4f6f9;
+  --cap-white: #ffffff;
+  --cap-text: #1e293b;
+  --cap-muted: #64748b;
+  --cap-border: #e2e8f0;
+  --cap-success: #15803d;
+  --cap-warning: #b45309;
+  --cap-danger: #b91c1c;
+  --cap-radius: 12px;
+
+  width: 100%;
+  min-height: 100%;
+  padding: 24px;
+  background: var(--cap-background);
+  color: var(--cap-text);
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.cap-root *,
+.cap-root *::before,
+.cap-root *::after {
+  box-sizing: border-box;
+}
+
+/* ==========================================
+   ENCABEZADO
+   ========================================== */
+
+.cap-header {
+  padding: 30px;
+  margin-bottom: 24px;
+  border-radius: var(--cap-radius);
+  background: linear-gradient(
+    135deg,
+    #12375e 0%,
+    #164b83 65%,
+    #2465a3 100%
+  );
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(18, 55, 94, 0.15);
+}
+
+.cap-header svg {
+  margin-bottom: 12px;
+  color: #ffffff;
+}
+
+.cap-header h1 {
+  margin: 0 0 8px;
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.cap-header p {
+  margin: 0;
+  color: #dbeafe;
+  font-size: 14px;
+  letter-spacing: 0.4px;
+}
+
+/* ==========================================
+   PANELES
+   ========================================== */
+
+.cap-panel {
+  min-width: 0;
+  padding: 24px;
+  margin-bottom: 20px;
+  background: var(--cap-white);
+  border: 1px solid var(--cap-border);
+  border-radius: var(--cap-radius);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.cap-panel h2 {
+  margin: 0 0 14px;
+  color: var(--cap-text);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.cap-panel p {
+  line-height: 1.6;
+}
+
+.cap-muted {
+  color: var(--cap-muted);
+  font-size: 13px;
+}
+
+/* ==========================================
+   INICIO DE SESIÓN
+   ========================================== */
+
+.cap-login {
+  width: 100%;
+  max-width: 440px;
+  margin: 35px auto;
+  padding: 32px;
+}
+
+.cap-login h2 {
+  margin-bottom: 10px;
+  text-align: center;
+  color: var(--cap-primary);
+  font-size: 23px;
+}
+
+.cap-login > p {
+  margin-bottom: 26px;
+  text-align: center;
+  color: var(--cap-muted);
+  font-size: 14px;
+}
+
+.cap-login label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+  color: var(--cap-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cap-login input {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  outline: none;
+  background: #ffffff;
+  color: var(--cap-text);
+  font-family: inherit;
+  font-size: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cap-login input:focus {
+  border-color: var(--cap-primary);
+  box-shadow: 0 0 0 3px rgba(22, 75, 131, 0.12);
+}
+
+.cap-login input::placeholder {
+  color: #94a3b8;
+}
+
+/* ==========================================
+   BOTONES PRINCIPALES
+   ========================================== */
+
+.cap-root .primary-button,
+.cap-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border: 1px solid var(--cap-primary);
+  border-radius: 8px;
+  background: var(--cap-primary);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.cap-root .primary-button:hover:not(:disabled),
+.cap-primary:hover:not(:disabled) {
+  background: var(--cap-primary-dark);
+  box-shadow: 0 3px 8px rgba(18, 55, 94, 0.15);
+}
+
+.cap-login .primary-button {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.cap-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 15px;
+  border: 1px solid var(--cap-border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--cap-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cap-secondary:hover:not(:disabled) {
+  border-color: var(--cap-primary);
+  background: var(--cap-primary-light);
+  color: var(--cap-primary);
+}
+
+.cap-root button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cap-root button:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 3px;
+}
+
+/* ==========================================
+   BARRA DE HERRAMIENTAS
+   ========================================== */
+
+.cap-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.cap-toolbar h2 {
+  margin: 0;
+}
+
+.cap-toolbar strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--cap-primary);
+  font-size: 15px;
+}
+
+.cap-toolbar .cap-muted {
+  overflow-wrap: anywhere;
+}
+
+/* ==========================================
+   MENÚ PRINCIPAL
+   ========================================== */
+
+.cap-menu {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(210px, 1fr)
+  );
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.cap-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 145px;
+  padding: 22px;
+  border: 1px solid var(--cap-border);
+  border-radius: var(--cap-radius);
+  background: #ffffff;
+  color: var(--cap-text);
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  transition:
+    transform 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background 0.2s;
+}
+
+.cap-tile svg {
+  flex-shrink: 0;
+  color: var(--cap-primary);
+}
+
+.cap-tile strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cap-tile span {
+  color: var(--cap-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.cap-tile:hover {
+  transform: translateY(-3px);
+  border-color: #93b4d6;
+  box-shadow: 0 5px 15px rgba(18, 55, 94, 0.08);
+}
+
+.cap-tile.cap-selected {
+  border-color: var(--cap-primary);
+  background: var(--cap-primary-light);
+  box-shadow: inset 0 0 0 1px var(--cap-primary);
+}
+
+/* ==========================================
+   BUSCADOR
+   ========================================== */
+
+.cap-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  margin: 20px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--cap-border);
+  border-radius: 8px;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.cap-search svg {
+  flex-shrink: 0;
+  color: var(--cap-muted);
+}
+
+.cap-search:focus-within {
+  border-color: var(--cap-primary);
+  box-shadow: 0 0 0 3px rgba(22, 75, 131, 0.08);
+}
+
+.cap-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 2px 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--cap-text);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.cap-search input::placeholder {
+  color: #94a3b8;
+}
+
+/* ==========================================
+   TABLAS
+   ========================================== */
+
+.cap-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  max-height: 620px;
+  overflow: auto;
+  border: 1px solid var(--cap-border);
+  border-radius: 8px;
+}
+
+.cap-table-wrap table {
+  width: 100%;
+  min-width: 600px;
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+  font-size: 13px;
+}
+
+.cap-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 14px;
+  border: none;
+  background: var(--cap-primary);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.cap-table-wrap tbody td {
+  padding: 13px 14px;
+  border: none;
+  border-bottom: 1px solid var(--cap-border);
+  color: var(--cap-text);
+  line-height: 1.5;
+  vertical-align: middle;
+}
+
+.cap-table-wrap tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.cap-table-wrap tbody tr:hover {
+  background: #eff6ff;
+}
+
+.cap-table-wrap tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ==========================================
+   ESTADOS DE AUTORIZACIÓN
+   ========================================== */
+
+.cap-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.cap-status-success {
+  border-color: #bbf7d0;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.cap-status-warning {
+  border-color: #fde68a;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.cap-status-danger {
+  border-color: #fecaca;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.cap-status-neutral {
+  border-color: #e2e8f0;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* Certificaciones opcionales:
+   no representan una restricción operativa */
+
+.cap-status-certification,
+.cap-status-optional {
+  border-color: #ddd6fe;
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+/* ==========================================
+   INDICADORES KPI
+   ========================================== */
+
+.cap-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(180px, 1fr)
+  );
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.cap-kpi {
+  padding: 20px;
+  border: 1px solid var(--cap-border);
+  border-left: 4px solid var(--cap-primary);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+
+.cap-kpi-label {
+  margin-bottom: 10px;
+  color: var(--cap-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cap-kpi-value {
+  color: var(--cap-text);
+  font-size: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cap-kpi-description {
+  margin-top: 6px;
+  color: var(--cap-muted);
+  font-size: 12px;
+}
+
+.cap-kpi-success {
+  border-left-color: #16a34a;
+}
+
+.cap-kpi-warning {
+  border-left-color: #d97706;
+}
+
+.cap-kpi-danger {
+  border-left-color: #dc2626;
+}
+
+.cap-kpi-certification {
+  border-left-color: #7c3aed;
+}
+
+/* ==========================================
+   FORMULARIOS GENERALES
+   ========================================== */
+
+.cap-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.cap-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.cap-field label {
+  color: var(--cap-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cap-field input,
+.cap-field select,
+.cap-field textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  outline: none;
+  background: #ffffff;
+  color: var(--cap-text);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.cap-field input:focus,
+.cap-field select:focus,
+.cap-field textarea:focus {
+  border-color: var(--cap-primary);
+  box-shadow: 0 0 0 3px rgba(22, 75, 131, 0.08);
+}
+
+.cap-field textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.cap-field-full {
+  grid-column: 1 / -1;
+}
+
+.cap-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--cap-border);
+}
+
+/* ==========================================
+   CARGA DE EVIDENCIAS
+   ========================================== */
+
+.cap-upload {
+  padding: 25px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.cap-upload:hover {
+  border-color: var(--cap-primary);
+  background: var(--cap-primary-light);
+}
+
+.cap-upload svg {
+  margin-bottom: 10px;
+  color: var(--cap-primary);
+}
+
+.cap-upload input[type="file"] {
+  width: 100%;
+  max-width: 100%;
+  margin-top: 12px;
+  color: var(--cap-muted);
+  font-size: 12px;
+}
+
+/* ==========================================
+   MENSAJES Y ALERTAS
+   ========================================== */
+
+.cap-error,
+.cap-alert-success,
+.cap-alert-warning,
+.cap-alert-info {
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  border: 1px solid;
+  border-left-width: 4px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.cap-error {
+  border-color: #fca5a5;
+  border-left-color: #dc2626;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.cap-alert-success {
+  border-color: #bbf7d0;
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.cap-alert-warning {
+  border-color: #fde68a;
+  border-left-color: #d97706;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.cap-alert-info {
+  border-color: #bfdbfe;
+  border-left-color: #2563eb;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+/* ==========================================
+   ESTADOS VACÍOS
+   ========================================== */
+
+.cap-table-wrap .cap-empty {
+  padding: 40px 20px;
+  color: var(--cap-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.cap-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  padding: 35px;
+  text-align: center;
+}
+
+.cap-welcome svg {
+  margin-bottom: 18px;
+  color: #94a3b8;
+}
+
+.cap-welcome h2 {
+  margin: 0 0 10px;
+  color: var(--cap-primary);
+  font-size: 21px;
+}
+
+.cap-welcome p {
+  max-width: 500px;
+  margin: 0;
+  color: var(--cap-muted);
+  font-size: 14px;
+}
+
+/* ==========================================
+   DISEÑO RESPONSIVO — TABLETS
+   ========================================== */
+
+@media (max-width: 1024px) {
+
+  .cap-root {
+    padding: 18px;
+  }
+
+  .cap-menu {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cap-panel {
+    padding: 20px;
+  }
+
+  .cap-header {
+    padding: 25px;
+  }
+
+}
+
+/* ==========================================
+   DISEÑO RESPONSIVO — CELULARES
+   ========================================== */
+
+@media (max-width: 600px) {
+
+  .cap-root {
+    padding: 12px;
+  }
+
+  .cap-header {
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .cap-header h1 {
+    font-size: 22px;
+  }
+
+  .cap-header p {
+    font-size: 12px;
+  }
+
+  .cap-panel {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .cap-panel h2 {
+    font-size: 18px;
+  }
+
+  .cap-login {
+    margin: 20px auto;
+    padding: 24px 20px;
+  }
+
+  .cap-menu {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .cap-tile {
+    min-height: 130px;
+    padding: 15px;
+    gap: 8px;
+  }
+
+  .cap-tile strong {
+    font-size: 13px;
+  }
+
+  .cap-tile span {
+    font-size: 11px;
+  }
+
+  .cap-tile:hover {
+    transform: none;
+  }
+
+  .cap-toolbar {
+    align-items: flex-start;
+  }
+
+  .cap-search {
+    max-width: 100%;
+  }
+
+  .cap-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .cap-kpi {
+    padding: 14px;
+  }
+
+  .cap-kpi-value {
+    font-size: 25px;
+  }
+
+  .cap-form-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .cap-form-actions {
+    flex-direction: column;
+  }
+
+  .cap-form-actions button {
+    width: 100%;
+  }
+
+  .cap-welcome {
+    padding: 24px 16px;
+  }
+
+  .cap-table-wrap {
+    max-height: 500px;
+  }
+
+  .cap-login input,
+  .cap-search input,
+  .cap-field input,
+  .cap-field select,
+  .cap-field textarea {
+    font-size: 16px;
+  }
+
+}
+
+/* ==========================================
+   PANTALLAS PEQUEÑAS
+   ========================================== */
+
+@media (max-width: 360px) {
+
+  .cap-menu,
+  .cap-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+/* ==========================================
+   ACCESIBILIDAD
+   ========================================== */
+
+@media (prefers-reduced-motion: reduce) {
+
+  .cap-root *,
+  .cap-root *::before,
+  .cap-root *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+
+}
