@@ -18,6 +18,7 @@ import {
   Workflow,
   LogOut,
   LogIn,
+  GraduationCap,
 } from "lucide-react";
 
 import { catalogo } from "./data/CatalogoMaquinas.js";
@@ -36,6 +37,8 @@ import EvaluacionConocimientosSeguridad from "./modules/EvaluacionConocimientosS
 import EvaluacionConocimientos from "./modules/EvaluacionConocimientos.jsx";
 import AuditoriaConocimientosCEP from "./modules/Auditorias/AuditoriaConocimientosCEP.jsx";
 import Auditorias from "./modules/Auditorias.jsx";
+import Capacitacion from "./modules/Capacitacion/Capacitacion.jsx";
+import ConsultaPublicaQR from "./modules/Capacitacion/ConsultaPublicaQR.jsx";
 
 import ResumenGemba from "./components/ResumenGemba.jsx";
 import { supabase } from "./lib/supabase.js";
@@ -158,6 +161,11 @@ function App() {
             id: "auditorias",
             label: "Auditorías",
             icon: ClipboardCheck,
+          },
+          {
+            id: "capacitacion",
+            label: "Capacitación",
+            icon: GraduationCap,
           },
           {
             id: "mantenimiento",
@@ -734,6 +742,13 @@ function App() {
       );
     }
 
+    // Abrir capacitación en una ruta independiente para aislar
+    // su sesión de Supabase de la sesión original de GDR.
+    if (itemId === "capacitacion") {
+      abrirCapacitacion();
+      return;
+    }
+
     setCurrentPage(itemId);
 
     if (itemId === "nuevo-gemba") {
@@ -1154,6 +1169,15 @@ function LoginPage({ onLogin }) {
           >
             <LogIn size={18} />
             Iniciar sesión
+          </button>
+
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={abrirCapacitacion}
+          >
+            <GraduationCap size={18} />
+            Acceder a capacitación
           </button>
         </div>
       </form>
@@ -1674,4 +1698,32 @@ function GembaModules({
   );
 }
 
-export default App;
+// Rutas independientes: GDR, capacitación y consulta pública QR.
+function abrirCapacitacion() {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("modulo", "capacitacion");
+  window.location.assign(url.toString());
+}
+
+function AppRouter() {
+  const params = new URLSearchParams(window.location.search);
+
+  // Evaluar la consulta pública antes del login de GDR.
+  if (params.has("cap_qr")) {
+    return <ConsultaPublicaQR token={params.get("cap_qr")} />;
+  }
+
+  if (params.get("modulo") === "capacitacion") {
+    return (
+      <Capacitacion
+        onBack={() => window.location.assign(window.location.pathname)}
+      />
+    );
+  }
+
+  return <App />;
+}
+
+export default AppRouter;
