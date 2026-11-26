@@ -20,7 +20,8 @@ import {
   Pencil,
   Save,
   X,
-  UserPlus
+  UserPlus,
+  UserMinus
 } from 'lucide-react';
 
 import './capacitacion.css';
@@ -108,6 +109,7 @@ export default function RiesgosCriticos({
   const [asignaciones, setAsignaciones] =
     useState([]);
 
+  const [asignacionesReales, setAsignacionesReales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -155,7 +157,8 @@ export default function RiesgosCriticos({
       const [
         rcResponse,
         colaboradoresResponse,
-        matrizResponse
+        matrizResponse,
+        asignacionesResponse
       ] = await Promise.all([
 
         client
@@ -185,7 +188,10 @@ export default function RiesgosCriticos({
           .eq('activo', true)
           .order('nombre', { ascending: true }),
 
-        client.rpc('cap_matriz_rc')
+        client.rpc('cap_matriz_rc'),
+        client.from('cap_rc_asignaciones')
+          .select('id,colaborador_id,riesgo_critico_id,activo,aplica')
+          .order('id')
 
       ]);
 
@@ -201,18 +207,46 @@ export default function RiesgosCriticos({
         throw matrizResponse.error;
       }
 
+      if (asignacionesResponse.error) throw asignacionesResponse.error;
+      if ([rcResponse, colaboradoresResponse, matrizResponse, asignacionesResponse]
+          .some(r => (r.data || []).length >= 1000)) {
+        throw new Error('Consulta posiblemente incompleta. Se requiere paginación antes de administrar asignaciones.');
+      }
+      const reales = asignacionesResponse.data || [];
+      const mapa = new Map(reales.map(a => [`${a.colaborador_id}-${a.riesgo_critico_id}`, a]));
+      setAsignacionesReales(reales);
       setRiesgos(rcResponse.data || []);
 
       setColaboradores(
         colaboradoresResponse.data || []
       );
 
+      const matriz = matrizResponse.data || [];
+      const presentes = new Set(matriz.map(a => `${a.colaborador_id}-${a.riesgo_critico_id}`));
+      const personas = new Map((colaboradoresResponse.data || []).map(c => [c.id,c]));
+      const catalogoRC = new Map((rcResponse.data || []).filter(r => r.activo).map(r => [r.id,r]));
+      const faltantes = reales.filter(a => a.activo === false && !presentes.has(`${a.colaborador_id}-${a.riesgo_critico_id}`) && personas.has(a.colaborador_id) && catalogoRC.has(a.riesgo_critico_id)).map(a => ({
+        colaborador_id: a.colaborador_id, riesgo_critico_id: a.riesgo_critico_id,
+        colaborador: personas.get(a.colaborador_id).nombre, puesto: personas.get(a.colaborador_id).puesto,
+        riesgo_critico: catalogoRC.get(a.riesgo_critico_id).nombre, abreviatura: catalogoRC.get(a.riesgo_critico_id).abreviatura,
+        asignacion_id: a.id, aplica: false, estado: 'INACTIVO', autorizado: false
+      }));
       setAsignaciones(
-        matrizResponse.data || []
+        [...matriz, ...faltantes].map(a => {
+          const real = mapa.get(`${a.colaborador_id}-${a.riesgo_critico_id}`);
+          return { ...a, asignacion_id: real?.id || a.asignacion_id,
+            asignacion_activa: real?.activo ?? null,
+            aplica: real ? real.aplica : a.aplica,
+            estado: real?.activo === false ? 'INACTIVO' : a.estado,
+            autorizado: real?.activo === false ? false : a.autorizado };
+        })
       );
 
     } catch (err) {
-
+      setAsignaciones([]);
+      setAsignacionesReales([]);
+      setRiesgos([]);
+      setColaboradores([]);
       setError(
         'No fue posible cargar los riesgos críticos: ' +
         err.message
@@ -231,6 +265,7 @@ export default function RiesgosCriticos({
     setRiesgos([]);
     setColaboradores([]);
     setAsignaciones([]);
+    setAsignacionesReales([]);
     setShowForm(false);
     setShowAsignacion(false);
     setSuccess('');
@@ -250,7 +285,7 @@ export default function RiesgosCriticos({
     );
 
     const asignadas = asignaciones.filter(
-      a => a.asignacion_id && a.aplica === true
+      a => a.asignacion_id && a.aplica === true && a.asignacion_activa === true
     );
 
     const autorizadas = asignadas.filter(
@@ -326,13 +361,15 @@ export default function RiesgosCriticos({
 
       if (
         filterEstado === 'ASIGNADOS' &&
-        !(a.asignacion_id && a.aplica)
+        !(a.asignacion_id && a.aplica && a.asignacion_activa === true)
       ) return false;
 
       if (
         filterEstado === 'SIN_ASIGNAR' &&
         a.asignacion_id
       ) return false;
+
+      if (filterEstado === 'DESASIGNADOS' && a.asignacion_activa !== false) return false;
 
       if (
         filterEstado === 'AUTORIZADOS' &&
@@ -344,6 +381,7 @@ export default function RiesgosCriticos({
         (
           !a.asignacion_id ||
           !a.aplica ||
+          a.asignacion_activa !== true ||
           a.autorizado
         )
       ) return false;
@@ -762,6 +800,7 @@ export default function RiesgosCriticos({
     if (!canEdit || saving) return;
 
     setTab('ASIGNACIONES');
+    setFilterEstado('TODOS');
     setShowForm(false);
     setError('');
     setSuccess('');
@@ -791,11 +830,11 @@ export default function RiesgosCriticos({
 
       if (!rc.activo) return false;
 
-      const existe = asignaciones.some(a =>
+      const existe = asignacionesReales.some(a =>
         a.colaborador_id ===
           asignacion.colaborador_id &&
         a.riesgo_critico_id === rc.id &&
-        Boolean(a.asignacion_id)
+        a.activo !== false
       );
 
       return !existe;
@@ -804,7 +843,7 @@ export default function RiesgosCriticos({
 
   }, [
     riesgos,
-    asignaciones,
+    asignacionesReales,
     asignacion.colaborador_id
   ]);
 
@@ -834,12 +873,12 @@ export default function RiesgosCriticos({
 
     }
 
-    const existe = asignaciones.some(a =>
+    const existe = asignacionesReales.some(a =>
       a.colaborador_id ===
         asignacion.colaborador_id &&
       a.riesgo_critico_id ===
         asignacion.riesgo_critico_id &&
-      Boolean(a.asignacion_id)
+      a.activo !== false
     );
 
     if (existe) {
@@ -902,6 +941,36 @@ export default function RiesgosCriticos({
 
     }
 
+  }
+
+  // ==========================================
+  // DESASIGNACIÓN MEDIANTE RPC
+  // ==========================================
+
+  async function desasignarRC(a) {
+    if (!client || !canEdit || saving || loading || a.asignacion_activa !== true) return;
+    const motivo = window.prompt(`Motivo de desasignación de ${a.riesgo_critico} para ${a.colaborador}:`);
+    if (motivo === null) return;
+    if (!motivo.trim()) { setError('Debes indicar el motivo de desasignación.'); return; }
+    if (!window.confirm(`¿Desasignar ${a.riesgo_critico} de ${a.colaborador}? Solo se permite si no tiene capacitaciones ni autorizaciones registradas.`)) return;
+    setSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      const { error } = await client.rpc('cap_desasignar_rc', {
+        p_asignacion_id: a.asignacion_id,
+        p_motivo: motivo.trim()
+      });
+      if (error) throw error;
+      setShowAsignacion(false);
+      setFilterEstado('TODOS');
+      setSuccess('Riesgo crítico desasignado correctamente. Se conserva el historial.');
+      await cargarDatos();
+    } catch (err) {
+      setError('No fue posible desasignar: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   // ==========================================
@@ -1856,6 +1925,8 @@ export default function RiesgosCriticos({
                     Sin asignar
                   </option>
 
+                  <option value="DESASIGNADOS">Desasignados</option>
+
                   <option value="AUTORIZADOS">
                     Autorizados
                   </option>
@@ -2185,14 +2256,16 @@ export default function RiesgosCriticos({
                     <td>
 
                       <span className={
-                        a.asignacion_id && a.aplica
+                        a.asignacion_id && a.aplica && a.asignacion_activa === true
                           ? 'cap-status cap-status-success'
                           : 'cap-status cap-status-neutral'
                       }>
 
                         {!a.asignacion_id
                           ? 'SIN ASIGNAR'
-                          : a.aplica
+                          : a.asignacion_activa === false
+                            ? 'DESASIGNADO'
+                            : a.aplica
                             ? 'ASIGNADO'
                             : 'NO APLICA'}
 
@@ -2232,7 +2305,7 @@ export default function RiesgosCriticos({
 
                       <td>
 
-                        {!a.asignacion_id ? (
+                        {(!a.asignacion_id || a.asignacion_activa === false) ? (
 
                           <button
                             type="button"
@@ -2247,10 +2320,17 @@ export default function RiesgosCriticos({
                           >
 
                             <UserPlus size={15} />
-                            Asignar
+                            {a.asignacion_activa === false ? 'Reasignar' : 'Asignar'}
 
                           </button>
 
+                        ) : a.asignacion_activa === true ? (
+                          <button type="button" className="cap-secondary"
+                            style={{ color: '#b91c1c' }}
+                            disabled={saving || loading}
+                            onClick={() => desasignarRC(a)}>
+                            <UserMinus size={15} /> Desasignar
+                          </button>
                         ) : '—'}
 
                       </td>
