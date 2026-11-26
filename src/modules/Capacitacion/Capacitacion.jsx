@@ -1,323 +1,616 @@
 
-import React, { useEffect, useState } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback
+} from 'react';
+
 import { createClient } from '@supabase/supabase-js';
+
 import {
   GraduationCap,
+  LayoutDashboard,
+  Users,
+  Factory,
+  ShieldCheck,
+  ShieldAlert,
+  ClipboardCheck,
+  ClipboardList,
+  CalendarClock,
+  Bell,
+  QrCode,
+  Settings,
+  FolderOpen,
+  Grid3X3,
+  Table,
+  BarChart3,
   LogIn,
   LogOut,
   RefreshCw,
-  Factory,
-  ShieldCheck,
-  Users,
-  CalendarClock,
-  Search
+  ArrowLeft,
+  Lock
 } from 'lucide-react';
+
+import Colaboradores from './Colaboradores.jsx';
+import Maquinas from './Maquinas.jsx';
+import RiesgosCriticos from './RiesgosCriticos.jsx';
+import CapacitacionMaquinas from './CapacitacionMaquinas.jsx';
+import CapacitacionRC from './CapacitacionRC.jsx';
+import AutorizacionesMaquinas from './AutorizacionesMaquinas.jsx';
+import AutorizacionesRC from './AutorizacionesRC.jsx';
+import MatrizMaquinas from './MatrizMaquinas.jsx';
+import MatrizRC from './MatrizRC.jsx';
+import Polivalencia from './Polivalencia.jsx';
+import Vencimientos from './Vencimientos.jsx';
+import Notificaciones from './Notificaciones.jsx';
+import ExpedienteColaborador from './ExpedienteColaborador.jsx';
+import CredencialesQR from './CredencialesQR.jsx';
+import GestionUsuarios from './GestionUsuarios.jsx';
+import DashboardCapacitacion from './DashboardCapacitacion.jsx';
 
 import './capacitacion.css';
 
 // ==========================================
-// CONFIGURACIÓN DE PERFILES
+// CONFIGURACIÓN DE ROLES
 // ==========================================
 
-const roles = {
-  JEFE_PRODUCCION: 'Jefe de producción',
-  ING_PROCESOS: 'Ingeniero de procesos',
-  GESTOR_RC: 'Gestor RC',
-  CONSULTA: 'Consulta'
+const JEFE = 'JEFE_PRODUCCION';
+const ING = 'ING_PROCESOS';
+const GESTOR = 'GESTOR_RC';
+const CONSULTA = 'CONSULTA';
+
+const TODOS = [
+  JEFE,
+  ING,
+  GESTOR,
+  CONSULTA
+];
+
+const RESPONSABLES = [
+  JEFE,
+  ING,
+  GESTOR
+];
+
+const ROLES = {
+  [JEFE]: 'Jefe de producción',
+  [ING]: 'Ingeniero de procesos',
+  [GESTOR]: 'Gestor de riesgos críticos',
+  [CONSULTA]: 'Consulta'
 };
 
 // ==========================================
-// CONSULTAS DISPONIBLES
+// CLIENTE DE SUPABASE INDEPENDIENTE
 // ==========================================
 
-const views = [
+let clienteCapacitacion = null;
+
+function crearCliente() {
+  if (clienteCapacitacion) {
+    return clienteCapacitacion;
+  }
+
+  const url =
+    import.meta.env.VITE_SUPABASE_URL;
+
+  const key =
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    return null;
+  }
+
+  clienteCapacitacion = createClient(url, key, {
+    auth: {
+      storageKey: 'gdr-cap-auth',
+      persistSession: false,
+      autoRefreshToken: true,
+      detectSessionInUrl: false
+    }
+  });
+
+  return clienteCapacitacion;
+}
+
+// ==========================================
+// CATÁLOGO DE MÓDULOS
+// ==========================================
+
+const MODULOS = [
   {
-    id: 'cap_matriz_maquinas',
-    title: 'Matriz de máquinas',
-    description: 'Competencias y autorizaciones por máquina',
-    icon: Factory,
-    columns: [
-      ['colaborador', 'Colaborador'],
-      ['puesto', 'Puesto'],
-      ['maquina', 'Máquina'],
-      ['estado', 'Estado']
-    ]
+    id: 'DASHBOARD',
+    grupo: 'Inicio',
+    nombre: 'Dashboard ejecutivo',
+    descripcion: 'Indicadores generales de capacitación',
+    icon: LayoutDashboard,
+    component: DashboardCapacitacion,
+    roles: TODOS
   },
   {
-    id: 'cap_matriz_rc',
-    title: 'Matriz de riesgos críticos',
-    description: 'Cumplimiento de requisitos de seguridad',
-    icon: ShieldCheck,
-    columns: [
-      ['colaborador', 'Colaborador'],
-      ['puesto', 'Puesto'],
-      ['riesgo_critico', 'Riesgo crítico'],
-      ['estado', 'Estado']
-    ]
+    id: 'NOTIFICACIONES',
+    grupo: 'Inicio',
+    nombre: 'Notificaciones',
+    descripcion: 'Alertas y solicitudes pendientes',
+    icon: Bell,
+    component: Notificaciones,
+    roles: TODOS
   },
   {
-    id: 'cap_polivalencia_maquinas',
-    title: 'Polivalencia',
-    description: 'Cobertura de operadores autorizados',
+    id: 'COLABORADORES',
+    grupo: 'Catálogos',
+    nombre: 'Colaboradores',
+    descripcion: 'Personal y líderes de capacitación',
     icon: Users,
-    columns: [
-      ['maquina', 'Máquina'],
-      ['minimo_operadores', 'Mínimo requerido'],
-      ['operadores_autorizados', 'Autorizados'],
-      ['operadores_pendientes', 'Pendientes'],
-      ['brecha', 'Brecha'],
-      ['estado', 'Estado']
-    ]
+    component: Colaboradores,
+    roles: TODOS
   },
   {
-    id: 'cap_consultar_vencimientos',
-    title: 'Vencimientos',
-    description: 'Control de requisitos y certificaciones',
+    id: 'MAQUINAS',
+    grupo: 'Catálogos',
+    nombre: 'Máquinas',
+    descripcion: 'Equipos y metas de polivalencia',
+    icon: Factory,
+    component: Maquinas,
+    roles: TODOS
+  },
+  {
+    id: 'RIESGOS_CRITICOS',
+    grupo: 'Catálogos',
+    nombre: 'Riesgos críticos',
+    descripcion: 'Catálogo y asignaciones individuales',
+    icon: ShieldAlert,
+    component: RiesgosCriticos,
+    roles: TODOS
+  },
+  {
+    id: 'CAPACITACION_MAQUINAS',
+    grupo: 'Capacitación y autorizaciones',
+    nombre: 'Capacitación de máquinas',
+    descripcion: 'Entrenamiento y evidencias',
+    icon: GraduationCap,
+    component: CapacitacionMaquinas,
+    roles: [JEFE, ING]
+  },
+  {
+    id: 'CAPACITACION_RC',
+    grupo: 'Capacitación y autorizaciones',
+    nombre: 'Capacitación RC',
+    descripcion: 'Moodle, entrenamiento y aptitud médica',
+    icon: ClipboardList,
+    component: CapacitacionRC,
+    roles: RESPONSABLES
+  },
+  {
+    id: 'AUTORIZACIONES_MAQUINAS',
+    grupo: 'Capacitación y autorizaciones',
+    nombre: 'Autorizaciones de máquinas',
+    descripcion: 'VoBo y control de autorizaciones',
+    icon: ClipboardCheck,
+    component: AutorizacionesMaquinas,
+    roles: [JEFE, ING]
+  },
+  {
+    id: 'AUTORIZACIONES_RC',
+    grupo: 'Capacitación y autorizaciones',
+    nombre: 'Autorizaciones RC',
+    descripcion: 'VoBo y permisos operativos',
+    icon: ShieldCheck,
+    component: AutorizacionesRC,
+    roles: [JEFE, ING]
+  },
+  {
+    id: 'MATRIZ_MAQUINAS',
+    grupo: 'Control y seguimiento',
+    nombre: 'Matriz de máquinas',
+    descripcion: 'Competencias por colaborador',
+    icon: Grid3X3,
+    component: MatrizMaquinas,
+    roles: TODOS
+  },
+  {
+    id: 'MATRIZ_RC',
+    grupo: 'Control y seguimiento',
+    nombre: 'Matriz de riesgos críticos',
+    descripcion: 'Cumplimiento de autorizaciones RC',
+    icon: Table,
+    component: MatrizRC,
+    roles: TODOS
+  },
+  {
+    id: 'POLIVALENCIA',
+    grupo: 'Control y seguimiento',
+    nombre: 'Polivalencia',
+    descripcion: 'Cobertura y brechas de operadores',
+    icon: BarChart3,
+    component: Polivalencia,
+    roles: TODOS
+  },
+  {
+    id: 'VENCIMIENTOS',
+    grupo: 'Control y seguimiento',
+    nombre: 'Vencimientos',
+    descripcion: 'Control preventivo de vigencias',
     icon: CalendarClock,
-    columns: [
-      ['colaborador', 'Colaborador'],
-      ['riesgo_critico', 'Riesgo crítico'],
-      ['requisito', 'Requisito'],
-      ['fecha_vencimiento', 'Vencimiento'],
-      ['dias_restantes', 'Días restantes'],
-      ['estado_vencimiento', 'Estado']
-    ]
+    component: Vencimientos,
+    roles: RESPONSABLES
+  },
+  {
+    id: 'EXPEDIENTES',
+    grupo: 'Administración',
+    nombre: 'Expedientes individuales',
+    descripcion: 'Ficha completa del colaborador',
+    icon: FolderOpen,
+    component: ExpedienteColaborador,
+    roles: [JEFE]
+  },
+  {
+    id: 'CREDENCIALES_QR',
+    grupo: 'Administración',
+    nombre: 'Credenciales QR',
+    descripcion: 'Generación, impresión y revocación',
+    icon: QrCode,
+    component: CredencialesQR,
+    roles: [JEFE]
+  },
+  {
+    id: 'GESTION_USUARIOS',
+    grupo: 'Administración',
+    nombre: 'Gestión de usuarios',
+    descripcion: 'Perfiles y vigencia de accesos',
+    icon: Settings,
+    component: GestionUsuarios,
+    roles: [JEFE]
   }
 ];
+
+// ==========================================
+// CONSULTAS PAGINADAS
+// ==========================================
+
+async function consultarPaginas(builder) {
+  const registros = [];
+  const pageSize = 200;
+
+  for (
+    let offset = 0;
+    ;
+    offset += pageSize
+  ) {
+    const { data, error } = await builder()
+      .range(offset, offset + pageSize - 1);
+
+    if (error) throw error;
+
+    const page = data || [];
+
+    registros.push(...page);
+
+    if (page.length < pageSize) {
+      break;
+    }
+  }
+
+  return registros;
+}
 
 // ==========================================
 // COMPONENTE PRINCIPAL
 // ==========================================
 
-export default function Capacitacion() {
+export default function Capacitacion({
+  onBack
+}) {
 
-  const [client] = useState(() =>
-    createClient(
-      import.meta.env.VITE_SUPABASE_URL,
-      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-      {
-        auth: {
-          storageKey: 'gdr-cap-auth',
-          persistSession: false,
-          detectSessionInUrl: false
-        }
-      }
-    )
-  );
+  const [client] = useState(crearCliente);
 
-  // Autenticación
+  const [session, setSession] = useState(null);
+  const [role, setRole] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [session, setSession] = useState(null);
-  const [role, setRole] = useState(null);
-
-  // Estados de interfaz
 
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [view, setView] = useState(null);
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [query, setQuery] = useState('');
-  const [reload, setReload] = useState(0);
+  const [roleError, setRoleError] = useState('');
+
+  const [activeView, setActiveView] =
+    useState('DASHBOARD');
+
+  const [unread, setUnread] = useState(null);
+
+  const [showMenu, setShowMenu] =
+    useState(true);
+
+  const userId =
+    session?.user?.id || null;
 
   // ==========================================
   // CONTROL DE SESIÓN
   // ==========================================
 
   useEffect(() => {
+    if (!client) {
+      setAuthLoading(false);
+      return;
+    }
 
-    const {
-      data: { subscription }
-    } = client.auth.onAuthStateChange(
-      (_event, nextSession) => {
-        setSession(nextSession);
-      }
-    );
+    let cancelled = false;
+    let authEventReceived = false;
+
+    const { data: listener } =
+      client.auth.onAuthStateChange(
+        (event, newSession) => {
+          if (cancelled) return;
+
+          authEventReceived = true;
+
+          setSession(newSession || null);
+          setAuthLoading(false);
+
+          if (!newSession) {
+            setRole(null);
+            setUnread(null);
+            setActiveView('DASHBOARD');
+          }
+        }
+      );
+
+    client.auth.getSession()
+      .then(({ data, error }) => {
+        if (cancelled || authEventReceived) return;
+
+        if (error) {
+          setError('No se pudo recuperar la sesión.');
+        }
+
+        setSession(data?.session || null);
+        setAuthLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled && !authEventReceived) {
+          setAuthLoading(false);
+          setError('No se pudo verificar la sesión.');
+        }
+      });
 
     return () => {
-      subscription.unsubscribe();
-      client.auth.stopAutoRefresh();
+      cancelled = true;
+      listener.subscription.unsubscribe();
     };
 
   }, [client]);
 
-  const userId = session?.user?.id;
-
   // ==========================================
-  // IDENTIFICACIÓN DEL PERFIL
+  // VALIDAR PERFIL VIGENTE
   // ==========================================
 
   useEffect(() => {
-
-    let alive = true;
-
     setRole(null);
-    setRows([]);
-    setView(null);
+    setRoleError('');
+    setUnread(null);
+    setActiveView('DASHBOARD');
 
-    if (!userId) return;
+    if (!client || !userId) {
+      setRoleLoading(false);
+      return;
+    }
 
-    setBusy(true);
+    let cancelled = false;
+    let checking = false;
 
-    client.rpc('cap_rol_actual')
-      .then(({ data, error }) => {
+    setRoleLoading(true);
 
-        if (!alive) return;
+    async function consultarRol() {
+      if (checking || cancelled) return;
 
-        if (
-          error ||
-          !Object.prototype.hasOwnProperty.call(
-            roles, data
-          )
-        ) {
-          setError(
-            'El usuario no tiene un perfil activo de capacitación.'
-          );
-        } else {
-          setRole(data);
-          setError('');
+      checking = true;
+
+      try {
+        const { data, error } =
+          await client.rpc('cap_rol_actual');
+
+        if (cancelled) return;
+
+        if (error) {
+          throw error;
         }
 
-        setBusy(false);
+        if (!TODOS.includes(data)) {
+          setRole(null);
 
-      })
-      .catch(() => {
+          setRoleError(
+            'Tu usuario no tiene un perfil de capacitación vigente.'
+          );
 
-        if (!alive) return;
+          return;
+        }
 
-        setError(
-          'No se pudo verificar el perfil del usuario.'
-        );
+        setRole(data);
+        setRoleError('');
 
-        setBusy(false);
+      } catch {
+        if (!cancelled) {
+          setRole(null);
 
-      });
+          setRoleError(
+            'No fue posible verificar tus permisos de acceso.'
+          );
+        }
+
+      } finally {
+        checking = false;
+
+        if (!cancelled) {
+          setRoleLoading(false);
+        }
+      }
+    }
+
+    consultarRol();
+
+    const interval = window.setInterval(
+      consultarRol,
+      60000
+    );
+
+    const alRegresar = () => {
+      if (document.visibilityState === 'visible') {
+        consultarRol();
+      }
+    };
+
+    document.addEventListener(
+      'visibilitychange',
+      alRegresar
+    );
 
     return () => {
-      alive = false;
+      cancelled = true;
+      window.clearInterval(interval);
+
+      document.removeEventListener(
+        'visibilitychange',
+        alRegresar
+      );
     };
 
   }, [client, userId]);
 
   // ==========================================
-  // CONSULTAS A SUPABASE
+  // CONTADOR DE NOTIFICACIONES
   // ==========================================
 
   useEffect(() => {
+    setUnread(null);
 
-    let alive = true;
+    if (!client || !role || !userId) return;
 
-    setRows([]);
-    setQuery('');
+    let cancelled = false;
+    let checking = false;
 
-    if (!role || !view || !userId) {
-      setLoading(false);
-      return;
-    }
+    async function consultarNotificaciones() {
+      if (checking || cancelled) return;
 
-    setLoading(true);
-    setError('');
+      checking = true;
 
-    client.rpc(view.id)
-      .then(({ data, error }) => {
+      try {
+        const [
+          notificaciones,
+          lecturas
+        ] = await Promise.all([
 
-        if (!alive) return;
+          consultarPaginas(() =>
+            client
+              .from('cap_notificaciones')
+              .select('id')
+              .eq('rol_destinatario', role)
+              .eq('activa', true)
+              .order('id')
+          ),
 
-        if (error) {
+          consultarPaginas(() =>
+            client
+              .from('cap_notificaciones_lecturas')
+              .select('notificacion_id')
+              .eq('usuario_id', userId)
+              .order('notificacion_id')
+          )
 
-          setError(
-            'No se pudo realizar la consulta: ' +
-            error.message
-          );
+        ]);
 
-        } else {
+        const leidas = new Set(
+          lecturas.map(l => l.notificacion_id)
+        );
 
-          setRows(
-            Array.isArray(data) ? data : []
-          );
+        const pendientes = notificaciones.filter(
+          n => !leidas.has(n.id)
+        ).length;
 
+        if (!cancelled) {
+          setUnread(pendientes);
         }
 
-        setLoading(false);
+      } catch {
+        if (!cancelled) {
+          setUnread(null);
+        }
 
-      })
-      .catch(() => {
+      } finally {
+        checking = false;
+      }
+    }
 
-        if (!alive) return;
+    consultarNotificaciones();
 
-        setError('Error de conexión con Supabase.');
-        setLoading(false);
-
-      });
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        consultarNotificaciones();
+      }
+    }, 30000);
 
     return () => {
-      alive = false;
+      cancelled = true;
+      window.clearInterval(interval);
     };
 
-  }, [client, role, view, userId, reload]);
+  }, [client, role, userId, activeView]);
 
   // ==========================================
   // INICIAR SESIÓN
   // ==========================================
 
-  async function login(e) {
+  async function iniciarSesion(event) {
+    event.preventDefault();
 
-    e.preventDefault();
+    if (
+      !client ||
+      busy ||
+      !email.trim() ||
+      !password
+    ) return;
 
     setBusy(true);
     setError('');
+    setRoleError('');
 
     try {
-
-      const { data, error } =
+      const { error } =
         await client.auth.signInWithPassword({
           email: email.trim(),
           password
         });
 
       if (error) {
-
-        setError(
-          'Correo electrónico o contraseña incorrectos.'
-        );
-
-      } else {
-
-        setSession(data.session);
-
+        throw error;
       }
 
-    } catch {
+      setActiveView('DASHBOARD');
+      setPassword('');
 
+    } catch {
       setError(
-        'No fue posible conectar con Supabase.'
+        'No fue posible iniciar sesión. Verifica tus credenciales.'
       );
 
     } finally {
-
-      setPassword('');
       setBusy(false);
-
     }
-
   }
 
   // ==========================================
   // CERRAR SESIÓN
   // ==========================================
 
-  async function logout() {
+  async function cerrarSesion() {
+    if (!client || busy) return false;
 
-    setError('');
-    setRows([]);
-    setView(null);
-    setRole(null);
     setBusy(true);
+    setError('');
 
     try {
-
       const { error } =
         await client.auth.signOut({
           scope: 'local'
@@ -326,464 +619,467 @@ export default function Capacitacion() {
       if (error) throw error;
 
       setSession(null);
+      setRole(null);
+      setUnread(null);
+      setEmail('');
+      setPassword('');
+      setRoleError('');
+      setActiveView('DASHBOARD');
+
+      return true;
 
     } catch {
-
       setError(
-        'No se pudo cerrar la sesión. Intenta nuevamente.'
+        'No fue posible cerrar sesión. Intenta nuevamente.'
       );
 
+      return false;
+
     } finally {
-
       setBusy(false);
+    }
+  }
 
+  async function regresar() {
+    if (
+      typeof onBack !== 'function' ||
+      busy
+    ) return;
+
+    if (session) {
+      const confirmar = window.confirm(
+        '¿Regresar a GDR y cerrar la sesión de capacitación?'
+      );
+
+      if (!confirmar) return;
+
+      const cerrado = await cerrarSesion();
+
+      if (!cerrado) return;
     }
 
+    onBack();
   }
 
   // ==========================================
-  // BÚSQUEDA DE REGISTROS
+  // NAVEGACIÓN SEGÚN PERFIL
   // ==========================================
 
-  const filtered = rows.filter(row => {
-
-    if (!query) return true;
-
-    return view?.columns.some(([key]) =>
-      String(row[key] ?? '')
-        .toLocaleLowerCase('es')
-        .includes(
-          query.toLocaleLowerCase('es')
-        )
+  const modulosPermitidos =
+    MODULOS.filter(m =>
+      m.roles.includes(role)
     );
 
-  });
+  const grupos = [
+    ...new Set(
+      modulosPermitidos.map(m => m.grupo)
+    )
+  ];
 
-  // ==========================================
-  // FORMATO DE ESTADOS
-  // ==========================================
+  const moduloActual =
+    modulosPermitidos.find(
+      m => m.id === activeView
+    ) ||
+    modulosPermitidos.find(
+      m => m.id === 'DASHBOARD'
+    );
 
-  function formatValue(value) {
+  const ActiveComponent =
+    moduloActual?.component;
 
-    if (value === null || value === undefined) {
-      return '—';
-    }
+  const navegar = useCallback((id) => {
+    const permitido = MODULOS.some(m =>
+      m.id === id &&
+      m.roles.includes(role)
+    );
 
-    if (typeof value === 'boolean') {
-      return value ? 'Sí' : 'No';
-    }
+    if (!permitido) return;
 
-    return String(value);
+    setActiveView(id);
 
-  }
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
 
-  function statusClass(value) {
-
-    switch (value) {
-
-      case 'AUTORIZADO':
-      case 'AUTORIZADA':
-      case 'VIGENTE':
-      case 'CAPACITADO':
-      case 'CUMPLE':
-        return 'cap-status cap-status-success';
-
-      case 'PROXIMO_A_VENCER':
-      case 'PENDIENTE_VOBO':
-      case 'PENDIENTE':
-      case 'REQUISITOS_PENDIENTES':
-        return 'cap-status cap-status-warning';
-
-      case 'VENCIDO':
-      case 'CRITICO':
-      case 'SUSPENDIDO':
-      case 'REVOCADO':
-      case 'NO_AUTORIZADO':
-      case 'REQUISITOS_INCOMPLETOS':
-      case 'CERTIFICACION_NO_VALIDA':
-        return 'cap-status cap-status-danger';
-
-      default:
-        return 'cap-status cap-status-neutral';
-
-    }
-
-  }
+  }, [role]);
 
   // ==========================================
   // INTERFAZ
   // ==========================================
 
   return (
-
     <section className="cap-root">
 
       <header className="cap-header">
 
         <GraduationCap size={36} />
 
-        <h1>Gestión de capacitación</h1>
+        <div style={{ flex: 1 }}>
+          <h1>
+            Gestión de capacitación
+          </h1>
 
-        <p>
-          TRANSMETAL · Competencias y autorizaciones
-        </p>
+          <p>
+            TRANSMETAL · Competencias y autorizaciones
+          </p>
+        </div>
+
+        {typeof onBack === 'function' && (
+          <button
+            type="button"
+            className="cap-secondary"
+            disabled={busy}
+            onClick={regresar}
+          >
+            <ArrowLeft size={17} />
+            Volver a GDR
+          </button>
+        )}
 
       </header>
 
+      {!client && (
+        <div className="cap-error" role="alert">
+          No se encontraron las variables de
+          configuración de Supabase.
+        </div>
+      )}
+
       {error && (
-        <div role="alert" className="cap-error">
+        <div className="cap-error" role="alert">
           {error}
         </div>
       )}
 
-      {!session ? (
+      {/* VERIFICANDO SESIÓN */}
 
-        /* FORMULARIO DE ACCESO */
+      {client && authLoading && (
+        <div className="cap-panel cap-welcome">
+          <RefreshCw size={36} />
+          <h2>Verificando sesión</h2>
+        </div>
+      )}
+
+      {/* INICIO DE SESIÓN */}
+
+      {client &&
+       !authLoading &&
+       !session && (
 
         <form
           className="cap-panel cap-login"
-          onSubmit={login}
+          onSubmit={iniciarSesion}
         >
 
-          <h2>Acceso al módulo</h2>
+          <GraduationCap
+            size={45}
+            color="#164b83"
+          />
 
-          <p>
-            Ingresa con tu usuario autorizado de capacitación.
+          <h2>Acceso a capacitación</h2>
+
+          <p className="cap-muted">
+            Ingresa con tu cuenta autorizada
+            de Supabase.
           </p>
 
-          <label>
+          <div className="cap-field">
 
-            Correo electrónico
+            <label htmlFor="cap-login-email">
+              Correo electrónico
+            </label>
 
             <input
+              id="cap-login-email"
               type="email"
-              autoComplete="username"
-              required
               value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="Correo electrónico"
+              required
+              disabled={busy}
+              autoComplete="username"
+              onChange={e =>
+                setEmail(e.target.value)
+              }
             />
 
-          </label>
+          </div>
 
-          <label>
+          <div className="cap-field">
 
-            Contraseña
+            <label htmlFor="cap-login-password">
+              Contraseña
+            </label>
 
             <input
+              id="cap-login-password"
               type="password"
-              autoComplete="current-password"
-              required
               value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Contraseña"
+              required
+              disabled={busy}
+              autoComplete="current-password"
+              onChange={e =>
+                setPassword(e.target.value)
+              }
             />
 
-          </label>
+          </div>
 
           <button
             type="submit"
-            className="primary-button"
-            disabled={busy}
+            className="cap-primary"
+            disabled={
+              busy ||
+              !email.trim() ||
+              !password
+            }
           >
-
             <LogIn size={18} />
 
-            {busy ? 'Ingresando...' : 'Iniciar sesión'}
-
+            {busy
+              ? 'Ingresando...'
+              : 'Iniciar sesión'}
           </button>
 
         </form>
+      )}
 
-      ) : (
+      {/* SESIÓN INICIADA */}
+
+      {session && !authLoading && (
 
         <>
-
-          {/* INFORMACIÓN DEL USUARIO */}
 
           <div className="cap-panel cap-toolbar">
 
             <div>
-
               <strong>
-                {
-                  roles[role] ||
-                  (
-                    busy
-                      ? 'Verificando perfil...'
-                      : 'Perfil no disponible'
-                  )
-                }
+                {ROLES[role] ||
+                  'Validando permisos'}
               </strong>
 
               <div className="cap-muted">
                 {session.user.email}
               </div>
-
             </div>
 
-            <button
-              className="cap-secondary"
-              disabled={busy}
-              onClick={logout}
-            >
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 8
+            }}>
 
-              <LogOut size={16} />
+              {role && (
+                <button
+                  type="button"
+                  className="cap-secondary"
+                  onClick={() =>
+                    navegar('NOTIFICACIONES')
+                  }
+                >
+                  <Bell size={18} />
 
-              Cerrar sesión
+                  Notificaciones
 
-            </button>
+                  {unread !== null &&
+                   unread > 0 && (
 
+                    <span style={{
+                      background: '#dc2626',
+                      color: '#ffffff',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '3px 7px',
+                      borderRadius: 12
+                    }}>
+                      {unread > 99
+                        ? '99+'
+                        : unread}
+                    </span>
+
+                  )}
+
+                </button>
+              )}
+
+              <button
+                type="button"
+                className="cap-secondary"
+                disabled={busy}
+                onClick={cerrarSesion}
+              >
+                <LogOut size={17} />
+                Cerrar sesión
+              </button>
+
+            </div>
           </div>
 
-          {role && (
+          {roleLoading && (
+            <div className="cap-panel cap-welcome">
+              <RefreshCw size={35} />
+              <h2>Verificando perfil</h2>
+            </div>
+          )}
+
+          {!roleLoading && !role && (
+            <div className="cap-panel cap-welcome">
+
+              <Lock size={45} color="#b91c1c" />
+
+              <h2>Acceso restringido</h2>
+
+              <p>
+                {roleError ||
+                  'No existe un perfil autorizado.'}
+              </p>
+
+              <p className="cap-muted">
+                Contacta al administrador del
+                sistema de capacitación.
+              </p>
+
+            </div>
+          )}
+
+          {/* MENÚ Y COMPONENTES */}
+
+          {!roleLoading && role && (
 
             <>
 
-              {/* MENÚ DE CAPACITACIÓN */}
+              <div className="cap-panel cap-toolbar">
 
-              <div className="cap-menu">
+                <button
+                  type="button"
+                  className="cap-secondary"
+                  aria-expanded={showMenu}
+                  onClick={() =>
+                    setShowMenu(previous => !previous)
+                  }
+                >
+                  <Grid3X3 size={17} />
 
-                {views
-                  .filter(item =>
-                    item.id !==
-                      'cap_consultar_vencimientos' ||
-                    role !== 'CONSULTA'
-                  )
-                  .map(item => {
+                  {showMenu
+                    ? 'Ocultar menú'
+                    : 'Mostrar menú'}
+                </button>
 
-                    const Icon = item.icon;
-
-                    return (
-
-                      <button
-                        key={item.id}
-                        className={
-                          view === item
-                            ? 'cap-tile cap-selected'
-                            : 'cap-tile'
-                        }
-                        onClick={() => setView(item)}
-                      >
-
-                        <Icon size={26} />
-
-                        <strong>
-                          {item.title}
-                        </strong>
-
-                        <span>
-                          {item.description}
-                        </span>
-
-                      </button>
-
-                    );
-
-                  })}
+                <button
+                  type="button"
+                  className="cap-secondary"
+                  onClick={() =>
+                    navegar('DASHBOARD')
+                  }
+                >
+                  <LayoutDashboard size={17} />
+                  Dashboard
+                </button>
 
               </div>
 
-              {/* CONTENIDO DEL MÓDULO */}
+              {showMenu && grupos.map(grupo => (
 
-              {view ? (
+                <div
+                  key={grupo}
+                  className="cap-panel"
+                >
 
-                <div className="cap-panel">
+                  <h3 style={{
+                    color: '#64748b',
+                    fontSize: 12,
+                    letterSpacing: 0.6,
+                    textTransform: 'uppercase'
+                  }}>
+                    {grupo}
+                  </h3>
 
-                  <div className="cap-toolbar">
+                  <div className="cap-menu">
 
-                    <h2>{view.title}</h2>
+                    {modulosPermitidos
+                      .filter(m => m.grupo === grupo)
+                      .map(m => {
 
-                    <button
-                      className="cap-secondary"
-                      disabled={loading}
-                      onClick={() =>
-                        setReload(n => n + 1)
-                      }
-                    >
+                        const Icon = m.icon;
 
-                      <RefreshCw size={16} />
+                        return (
+                          <button
+                            type="button"
+                            key={m.id}
+                            className={
+                              moduloActual?.id === m.id
+                                ? 'cap-tile cap-selected'
+                                : 'cap-tile'
+                            }
+                            aria-pressed={
+                              moduloActual?.id === m.id
+                            }
+                            onClick={() =>
+                              navegar(m.id)
+                            }
+                          >
 
-                      Actualizar
+                            <Icon size={25} />
 
-                    </button>
+                            <strong>
+                              {m.nombre}
 
-                  </div>
-
-                  {/* BUSCADOR */}
-
-                  <div className="cap-search">
-
-                    <Search size={18} />
-
-                    <input
-                      value={query}
-                      onChange={e =>
-                        setQuery(e.target.value)
-                      }
-                      placeholder="Buscar registros..."
-                    />
-
-                  </div>
-
-                  {view.id ===
-                    'cap_consultar_vencimientos' && (
-
-                    <p className="cap-muted">
-
-                      La certificación adicional es opcional
-                      y no condiciona la autorización
-                      operativa.
-
-                    </p>
-
-                  )}
-
-                  {loading ? (
-
-                    <p role="status">
-                      Cargando información...
-                    </p>
-
-                  ) : (
-
-                    <>
-
-                      <p className="cap-muted">
-
-                        {filtered.length} registros
-
-                      </p>
-
-                      <div className="cap-table-wrap">
-
-                        <table>
-
-                          <thead>
-
-                            <tr>
-
-                              {view.columns.map(
-                                ([key, label]) => (
-
-                                  <th key={key}>
-                                    {label}
-                                  </th>
-
-                                )
+                              {m.id === 'NOTIFICACIONES' &&
+                               unread > 0 && (
+                                <span style={{
+                                  color: '#b91c1c'
+                                }}>
+                                  {' '}({unread})
+                                </span>
                               )}
+                            </strong>
 
-                            </tr>
+                            <span>
+                              {m.descripcion}
+                            </span>
 
-                          </thead>
+                          </button>
+                        );
+                      })}
 
-                          <tbody>
-
-                            {filtered.map((row, index) => (
-
-                              <tr key={index}>
-
-                                {view.columns.map(
-                                  ([key]) => (
-
-                                    <td key={key}>
-
-                                      {
-                                        key === 'estado' ||
-                                        key === 'estado_vencimiento'
-                                          ? (
-
-                                            <span
-                                              className={
-                                                statusClass(
-                                                  row[key]
-                                                )
-                                              }
-                                            >
-
-                                              {formatValue(
-                                                row[key]
-                                              ).replaceAll('_', ' ')}
-
-                                            </span>
-
-                                          ) : (
-
-                                            formatValue(row[key])
-
-                                          )
-                                      }
-
-                                    </td>
-
-                                  )
-                                )}
-
-                              </tr>
-
-                            ))}
-
-                            {filtered.length === 0 && (
-
-                              <tr>
-
-                                <td
-                                  colSpan={view.columns.length}
-                                  className="cap-empty"
-                                >
-
-                                  No hay registros disponibles.
-
-                                </td>
-
-                              </tr>
-
-                            )}
-
-                          </tbody>
-
-                        </table>
-
-                      </div>
-
-                    </>
-
-                  )}
+                  </div>
 
                 </div>
 
-              ) : (
+              ))}
 
-                <div className="cap-panel cap-welcome">
+              {ActiveComponent && (
+                <div style={{
+                  minWidth: 0,
+                  marginTop: 20
+                }}>
 
-                  <GraduationCap size={48} />
-
-                  <h2>
-                    Sistema de gestión de competencias
-                  </h2>
-
-                  <p>
-
-                    Selecciona un módulo para consultar
-                    las capacitaciones, autorizaciones
-                    y vencimientos de los colaboradores.
-
-                  </p>
+                  <ActiveComponent
+                    key={
+                      `${userId}-${role}-${moduloActual.id}`
+                    }
+                    client={client}
+                    role={role}
+                    onNavigate={navegar}
+                  />
 
                 </div>
-
               )}
 
             </>
-
           )}
 
         </>
-
       )}
 
+      <footer style={{
+        textAlign: 'center',
+        color: '#64748b',
+        fontSize: 11,
+        padding: '24px 10px'
+      }}>
+        TRANSMETAL · Sistema de gestión de capacitación
+      </footer>
+
     </section>
-
   );
-
 }
